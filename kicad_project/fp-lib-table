@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "Footprints")(type "KiCad")(uri "E:/Kicad_Libraries/stm32_blackpill/Kicad-STM32-master/Footprints")(options "")(descr ""))
+)

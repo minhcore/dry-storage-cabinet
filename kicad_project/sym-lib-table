@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "YAAJ_BlackPill_Part_Like_SWD_Breakout")(type "Legacy")(uri "E:/Kicad_Libraries/stm32_blackpill/Kicad-STM32-master/Symbols/YAAJ_BlackPill_SWD_Breakout.lib")(options "")(descr ""))
+)
