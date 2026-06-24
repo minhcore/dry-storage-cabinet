@@ -1,0 +1,2 @@
+../Core/Src/encoder.c:3:6:encoder_init	1
+../Core/Src/encoder.c:15:18:encoder_read	4
