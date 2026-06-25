@@ -14,9 +14,9 @@ typedef enum
 typedef struct
 {
 	TIM_HandleTypeDef* tim;
-	volatile uint32_t current_value;
-	uint32_t last_value;
-	encoder_status_t status;
+	volatile int32_t current_value;
+	volatile int32_t last_value;
+	volatile encoder_status_t status;
 	uint16_t button_pin;
 	volatile uint8_t is_pressed_button;
 	volatile uint32_t debounce_tick;

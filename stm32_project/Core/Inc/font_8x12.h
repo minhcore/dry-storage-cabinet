@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define FONT_8X12_COUNT    (95)
+#define FONT_8X12_COUNT    (96)
 
 typedef struct
 {

@@ -7,6 +7,7 @@
 
 #define OLED_ADDR (0x3C << 1)
 #define OLED_BUFFER_SIZE 1024
+#define OLED_DEGREE 0x80
 
 typedef enum
 {

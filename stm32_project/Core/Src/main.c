@@ -24,6 +24,8 @@
 #include "uart.h"
 #include "encoder.h"
 #include "oled.h"
+#include "sht30.h"
+#include "display.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,15 +47,16 @@
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 oled_t oled;
 encoder_t encoder;
-uint32_t uart_tick = 0;
+sht30_t sht30;
+display_t display;
 uint32_t oled_tick = 0;
-uint32_t number = 50;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,6 +65,7 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -76,6 +80,100 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		{
 			encoder.is_pressed_button = 1;
 			encoder.debounce_tick = HAL_GetTick();
+		}
+	}
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if (htim == &htim3)
+	{
+		encoder_status_t status;
+		status = encoder_read(&encoder);
+		switch(status)
+		{
+		case ENCODER_NONE:
+			break;
+		case ENCODER_SCROLL_UP:
+			if (display.state == DISPLAY_MENU)
+			{
+				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_SET) ? CURSOR_MENU_EXIT : display.cursor_menu - 1;
+			}
+			else if (display.state == DISPLAY_SET_TARGET)
+			{
+				display.cursor_set_target = (display.cursor_set_target == CURSOR_SET_TARGET_TEMP) ? CURSOR_SET_TARGET_BACK : display.cursor_set_target - 1;
+			}
+			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
+			{
+				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
+				{
+					sht30.expected_temp += 1;
+				}
+				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
+				{
+					sht30.expected_hum += 1;
+				}
+
+				// T.B.D about safety min and max
+			}
+			break;
+		case ENCODER_SCROLL_DOWN:
+			if (display.state == DISPLAY_MENU)
+			{
+				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_EXIT) ? CURSOR_MENU_SET : display.cursor_menu + 1;
+			}
+			else if (display.state == DISPLAY_SET_TARGET)
+			{
+				display.cursor_set_target = (display.cursor_set_target == CURSOR_SET_TARGET_BACK) ? CURSOR_SET_TARGET_TEMP : display.cursor_set_target + 1;
+			}
+			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
+			{
+				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
+				{
+					sht30.expected_temp -= 1;
+				}
+				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
+				{
+					sht30.expected_hum -= 1;
+				}
+
+				// T.B.D about safety min and max
+			}
+			break;
+		case ENCODER_PRESSED:
+			if (display.state == DISPLAY_MAIN) display.state = DISPLAY_MENU;
+			else if (display.state == DISPLAY_MENU)
+			{
+				if (display.cursor_menu == CURSOR_MENU_SET)
+				{
+					display.state = DISPLAY_SET_TARGET;
+					display.cursor_set_target = CURSOR_SET_TARGET_TEMP;
+				}
+				else if (display.cursor_menu == CURSOR_MENU_EXIT)
+				{
+					// back to main display
+					display.state = DISPLAY_MAIN;
+					display.cursor_menu = CURSOR_MENU_SET;
+				}
+			}
+			else if (display.state == DISPLAY_SET_TARGET)
+			{
+				if (display.cursor_set_target != CURSOR_SET_TARGET_BACK)
+				{
+					display.state = DISPLAY_SET_TARGET_CHOOSE;
+				}
+				else
+				{
+					display.state = DISPLAY_MENU;
+					display.cursor_menu = CURSOR_MENU_SET;
+				}
+
+			}
+			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
+			{
+				display.state = DISPLAY_SET_TARGET;
+			}
+			break;
 		}
 	}
 }
@@ -113,61 +211,27 @@ int main(void)
   MX_I2C1_Init();
   MX_TIM2_Init();
   MX_USART2_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   oled_init(&oled, &hi2c1, OLED_ADDR);
   encoder_init(&encoder, &htim2, GPIO_PIN_10);
+  sht30.temp = 27.49024;
+  sht30.hum = 10.80202;
+  sht30.expected_hum = 10.15;
+  sht30.expected_temp = 25.631;
+  display.state = DISPLAY_MAIN;
+  display.cursor_menu = CURSOR_MENU_SET;
+  HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if (HAL_GetTick() - uart_tick >= 500)
-	  {
-		  encoder_status_t status;
-		  status = encoder_read(&encoder);
-		  uart_send_string("ENCODER STATE:" );
-		  switch(status)
-		  {
-		  case ENCODER_NONE:
-			  uart_send_string("NONE\r\n");
-			  break;
-		  case ENCODER_SCROLL_UP:
-			  uart_send_string("UP\r\n");
-			  break;
-		  case ENCODER_SCROLL_DOWN:
-			  uart_send_string("DOWN\r\n");
-			  break;
-		  case ENCODER_PRESSED:
-			  uart_send_string("PRESSED\r\n");
-			  break;
-		  }
-		  uart_tick = HAL_GetTick();
-	  }
 
 	  if (HAL_GetTick() - oled_tick >= 200)
 	  {
-		  encoder_status_t status;
-		  status = encoder_read(&encoder);
-		  switch(status)
-		  {
-		  case ENCODER_NONE:
-			  break;
-		  case ENCODER_SCROLL_UP:
-			  number = (number < 100) ? number + 1 : 0;
-			  break;
-		  case ENCODER_SCROLL_DOWN:
-			  number = (number > 0) ? number - 1 : 100;
-			  break;
-		  case ENCODER_PRESSED:
-			  number = 50;
-			  break;
-		  }
-		  oled_clear_display(&oled);
-		  oled_draw_string(&oled, "number = ", 4, 25);
-		  oled_draw_int(&oled, number, 4, 98);
-		  oled_send_buffer(&oled);
-
+		  display_task(&display, &oled, &sht30);
 		  oled_tick = HAL_GetTick();
 	  }
     /* USER CODE END WHILE */
@@ -284,7 +348,7 @@ static void MX_TIM2_Init(void)
   sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 0;
+  sConfig.IC2Filter = 10;
   if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -298,6 +362,51 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 15;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 9999;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
 
 }
 
