@@ -59,6 +59,7 @@ sht30_t sht30;
 control_t control;
 display_t display;
 uint32_t oled_tick = 0;
+uint32_t uart_tick = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -270,8 +271,15 @@ int main(void)
   encoder_init(&encoder, &htim2, GPIO_PIN_10);
   control_init(&control);
   display_init(&display);
-  sht30.temp = 27.49024;
-  sht30.hum = 10.80202;
+  if ((sht30_init(&sht30, &hi2c1, SHT30_ADDR, sht30_high_repeatability_mode)) == SHT30_ERROR)
+  {
+	  while(1)
+	  {
+		  uart_send_string("sht30 error!!!\n\r");
+		  HAL_Delay(1000);
+	  }
+  }
+  else uart_send_string("init completed!");
   HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
@@ -284,6 +292,18 @@ int main(void)
 	  {
 		  display_task(&display, &oled, &sht30, &control);
 		  oled_tick = HAL_GetTick();
+	  }
+	  if (HAL_GetTick() - uart_tick >= 1000)
+	  {
+		  sht30_get(&sht30);
+		  sht30_calculate(&sht30);
+		  uart_send_string("=====================\r\n");
+		  uart_send_string("T: ");
+		  uart_send_int(sht30.temp);
+		  uart_send_string("\r\nRH: ");
+		  uart_send_int(sht30.hum);
+		  uart_send_string("\r\n=====================\r\n");
+		  uart_tick = HAL_GetTick();
 	  }
     /* USER CODE END WHILE */
 
