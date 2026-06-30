@@ -3,7 +3,15 @@
 static uint32_t blink_tick = 0;
 static uint8_t is_blink = 1;
 
-void display_task(display_t* display, oled_t* oled, sht30_t* sht30)
+void display_init(display_t* display)
+{
+	display->state = DISPLAY_MAIN;
+	display->cursor_menu = CURSOR_MENU_SET_TARGET;
+	display->cursor_set_target = CURSOR_SET_TARGET_TEMP;
+	display->cursor_set_hysteresis = CURSOR_SET_HYSTERESIS_TEMP;
+}
+
+void display_task(display_t* display, oled_t* oled, sht30_t* sht30, control_t* control)
 {
 	uint16_t temp_x10;
 	uint16_t hum_x10;
@@ -31,7 +39,7 @@ void display_task(display_t* display, oled_t* oled, sht30_t* sht30)
 
 		// Expected temperature
 		oled_draw_string(oled, "SET T:  ", 4, 0);
-		oled_draw_int(oled, sht30->expected_temp, 4, 64);
+		oled_draw_int(oled, (uint8_t)control->target_temp, 4, 64);
 		oled_draw_char(oled, OLED_DEGREE, 4, 80);
 		oled_draw_char(oled, 'C', 4, 88);
 
@@ -48,7 +56,7 @@ void display_task(display_t* display, oled_t* oled, sht30_t* sht30)
 
 		// Expected humidity
 		oled_draw_string(oled, "SET RH: ", 6, 0);
-		oled_draw_int(oled, sht30->expected_hum, 6, 64);
+		oled_draw_int(oled, (uint8_t)control->target_hum, 6, 64);
 		oled_draw_char(oled, '%', 6, 88);
 
 		break;
@@ -56,75 +64,135 @@ void display_task(display_t* display, oled_t* oled, sht30_t* sht30)
 	case DISPLAY_MENU:
 		switch(display->cursor_menu)
 		{
-		case CURSOR_MENU_SET:
+		case CURSOR_MENU_SET_TARGET:
 			page = 2;
+			break;
+		case CURSOR_MENU_SET_HYSTERESIS:
+			page = 4;
 			break;
 		case CURSOR_MENU_EXIT:
-			page = 4;
-			break;
-		}
-
-		oled_draw_string(oled, "MENU:", 0, 16);
-		oled_draw_string(oled, ">", page, 2);
-		oled_draw_string(oled, "1.Set Target", 2, 16);
-		oled_draw_string(oled, "2.Exit", 4, 16);
-
-		break;
-
-	case DISPLAY_SET_TARGET:
-	case DISPLAY_SET_TARGET_CHOOSE:
-		switch(display->cursor_set_target)
-		{
-		case CURSOR_SET_TARGET_TEMP:
-			page = 2;
-			break;
-		case CURSOR_SET_TARGET_HUM:
-			page = 4;
-			break;
-		case CURSOR_SET_TARGET_BACK:
 			page = 6;
 			break;
 		}
 
-		oled_draw_string(oled, "SET TARGET:", 0, 16);
-		oled_draw_string(oled, ">", page, 2);
-
-		oled_draw_string(oled, "1.T: ", 2, 16);
-		oled_draw_int(oled, sht30->expected_temp, 2, 56);
-		oled_draw_char(oled, OLED_DEGREE, 2, 72);
-		oled_draw_char(oled, 'C', 2, 80);
-
-		oled_draw_string(oled, "2.RH: ", 4, 16);
-		oled_draw_int(oled, sht30->expected_hum, 4, 64);
-		oled_draw_char(oled,'%', 4, 88);
-
-		oled_draw_string(oled, "3.Back", 6, 16);
-
-		if (display->state == DISPLAY_SET_TARGET_CHOOSE)
-		{
-			if (display->cursor_set_target == CURSOR_SET_TARGET_TEMP)
-			{
-				if (HAL_GetTick() - blink_tick >= 500)
-				{
-					if (is_blink) oled_draw_string(oled, "  ", page, 56);
-					else oled_draw_int(oled, sht30->expected_temp, page, 56);
-					is_blink = (~is_blink) & 0x01;
-					blink_tick = HAL_GetTick();
-				}
-			}
-			else if (display->cursor_set_target == CURSOR_SET_TARGET_HUM)
-			{
-				if (HAL_GetTick() - blink_tick >= 500)
-				{
-					if (is_blink) oled_draw_string(oled, "  ", page, 64);
-					else oled_draw_int(oled, sht30->expected_hum, page, 64);
-					is_blink = (~is_blink) & 0x01;
-					blink_tick = HAL_GetTick();
-				}
-			}
-		}
+		oled_draw_string(oled, "MENU:", 0, 16);
+		oled_draw_char(oled, '>', page, 2);
+		oled_draw_string(oled, "1.Set Target", 2, 16);
+		oled_draw_string(oled, "2.Hysteresis", 4, 16);
+		oled_draw_string(oled, "3.Exit", 6, 16);
 
 		break;
+
+		case DISPLAY_SET_TARGET:
+		case DISPLAY_SET_TARGET_CHOOSE:
+			switch(display->cursor_set_target)
+			{
+			case CURSOR_SET_TARGET_TEMP:
+				page = 2;
+				break;
+			case CURSOR_SET_TARGET_HUM:
+				page = 4;
+				break;
+			case CURSOR_SET_TARGET_BACK:
+				page = 6;
+				break;
+			}
+
+			oled_draw_string(oled, "SET TARGET:", 0, 16);
+			oled_draw_char(oled, '>', page, 2);
+
+			oled_draw_string(oled, "1.T: ", 2, 16);
+			oled_draw_int(oled, (uint8_t)control->target_temp, 2, 64);
+			oled_draw_char(oled, OLED_DEGREE, 2, 80);
+			oled_draw_char(oled, 'C', 2, 88);
+
+			oled_draw_string(oled, "2.RH: ", 4, 16);
+			oled_draw_int(oled, (uint8_t)control->target_hum, 4, 64);
+			oled_draw_char(oled,'%', 4, 88);
+
+			oled_draw_string(oled, "3.Back", 6, 16);
+
+			if (display->state == DISPLAY_SET_TARGET_CHOOSE)
+			{
+				if (display->cursor_set_target == CURSOR_SET_TARGET_TEMP)
+				{
+					if (HAL_GetTick() - blink_tick >= 500)
+					{
+						if (is_blink) oled_draw_string(oled, "  ", page, 64);
+						else oled_draw_int(oled, (uint8_t)control->target_temp, page, 64);
+						is_blink = (~is_blink) & 0x01;
+						blink_tick = HAL_GetTick();
+					}
+				}
+				else if (display->cursor_set_target == CURSOR_SET_TARGET_HUM)
+				{
+					if (HAL_GetTick() - blink_tick >= 500)
+					{
+						if (is_blink) oled_draw_string(oled, "  ", page, 64);
+						else oled_draw_int(oled, (uint8_t)control->target_hum, page, 64);
+						is_blink = (~is_blink) & 0x01;
+						blink_tick = HAL_GetTick();
+					}
+				}
+			}
+
+			break;
+
+		case DISPLAY_SET_HYSTERESIS:
+		case DISPLAY_SET_HYSTERESIS_CHOOSE:
+
+			switch(display->cursor_set_hysteresis)
+			{
+			case CURSOR_SET_HYSTERESIS_TEMP:
+				page = 2;
+				break;
+			case CURSOR_SET_HYSTERESIS_HUM:
+				page = 4;
+				break;
+			case CURSOR_SET_HYSTERESIS_BACK:
+				page = 6;
+				break;
+			}
+
+			oled_draw_string(oled, "HYSTERESIS:", 0, 16);
+			oled_draw_char(oled, '>', page, 0);
+
+			oled_draw_string(oled, "1.T: ", 2, 16);
+			oled_draw_int(oled, (uint8_t)control->temp_hysteresis, 2, 64);
+			oled_draw_char(oled, OLED_DEGREE, 2, 80);
+			oled_draw_char(oled, 'C', 2, 88);
+
+			oled_draw_string(oled, "2.RH: ", 4, 16);
+			oled_draw_int(oled, (uint8_t)control->hum_hysteresis, 4, 64);
+			oled_draw_char(oled, '%', 4, 88);
+
+			oled_draw_string(oled, "3.Back", 6, 16);
+
+			if (display->state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+			{
+				if (display->cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
+				{
+					if (HAL_GetTick() - blink_tick >= 500)
+					{
+						if (is_blink) oled_draw_string(oled, "  ", page, 64);
+						else oled_draw_int(oled, (uint8_t)control->temp_hysteresis, page, 64);
+						is_blink = (~is_blink) & 0x01;
+						blink_tick = HAL_GetTick();
+					}
+				}
+				else if (display->cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
+				{
+					if (HAL_GetTick() - blink_tick >= 500)
+					{
+						if (is_blink) oled_draw_string(oled, "  ", page, 64);
+						else oled_draw_int(oled, (uint8_t)control->hum_hysteresis, page, 64);
+						is_blink = (~is_blink) & 0x01;
+						blink_tick = HAL_GetTick();
+					}
+				}
+			}
+
+			break;
 
 	}
 	oled_send_buffer(oled);

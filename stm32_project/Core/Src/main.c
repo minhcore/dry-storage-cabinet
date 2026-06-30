@@ -25,6 +25,7 @@
 #include "encoder.h"
 #include "oled.h"
 #include "sht30.h"
+#include "control.h"
 #include "display.h"
 /* USER CODE END Includes */
 
@@ -55,6 +56,7 @@ UART_HandleTypeDef huart2;
 oled_t oled;
 encoder_t encoder;
 sht30_t sht30;
+control_t control;
 display_t display;
 uint32_t oled_tick = 0;
 /* USER CODE END PV */
@@ -97,7 +99,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		case ENCODER_SCROLL_UP:
 			if (display.state == DISPLAY_MENU)
 			{
-				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_SET) ? CURSOR_MENU_EXIT : display.cursor_menu - 1;
+				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_SET_TARGET) ? CURSOR_MENU_EXIT : display.cursor_menu - 1;
 			}
 			else if (display.state == DISPLAY_SET_TARGET)
 			{
@@ -107,20 +109,35 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			{
 				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
 				{
-					sht30.expected_temp += 1;
+					control.target_temp += 1;
 				}
 				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
 				{
-					sht30.expected_hum += 1;
+					control.target_hum += 1;
 				}
 
 				// T.B.D about safety min and max
+			}
+			else if (display.state == DISPLAY_SET_HYSTERESIS)
+			{
+				display.cursor_set_hysteresis = (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP) ? CURSOR_SET_HYSTERESIS_BACK : display.cursor_set_hysteresis - 1;
+			}
+			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+			{
+				if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
+				{
+					control.temp_hysteresis += 1;
+				}
+				else if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
+				{
+					control.hum_hysteresis += 1;
+				}
 			}
 			break;
 		case ENCODER_SCROLL_DOWN:
 			if (display.state == DISPLAY_MENU)
 			{
-				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_EXIT) ? CURSOR_MENU_SET : display.cursor_menu + 1;
+				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_EXIT) ? CURSOR_MENU_SET_TARGET : display.cursor_menu + 1;
 			}
 			else if (display.state == DISPLAY_SET_TARGET)
 			{
@@ -130,30 +147,50 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 			{
 				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
 				{
-					sht30.expected_temp -= 1;
+					control.target_temp -= 1;
 				}
 				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
 				{
-					sht30.expected_hum -= 1;
+					control.target_hum -= 1;
 				}
 
 				// T.B.D about safety min and max
+			}
+			else if (display.state == DISPLAY_SET_HYSTERESIS)
+			{
+				display.cursor_set_hysteresis = (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_BACK) ? CURSOR_SET_HYSTERESIS_TEMP : display.cursor_set_hysteresis + 1;
+			}
+			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+			{
+				if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
+				{
+					control.temp_hysteresis -= 1;
+				}
+				else if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
+				{
+					control.hum_hysteresis -= 1;
+				}
 			}
 			break;
 		case ENCODER_PRESSED:
 			if (display.state == DISPLAY_MAIN) display.state = DISPLAY_MENU;
 			else if (display.state == DISPLAY_MENU)
 			{
-				if (display.cursor_menu == CURSOR_MENU_SET)
+				if (display.cursor_menu == CURSOR_MENU_SET_TARGET)
 				{
 					display.state = DISPLAY_SET_TARGET;
 					display.cursor_set_target = CURSOR_SET_TARGET_TEMP;
+				}
+				else if (display.cursor_menu == CURSOR_MENU_SET_HYSTERESIS)
+				{
+					display.state = DISPLAY_SET_HYSTERESIS;
+					display.cursor_set_hysteresis = CURSOR_SET_HYSTERESIS_TEMP;
 				}
 				else if (display.cursor_menu == CURSOR_MENU_EXIT)
 				{
 					// back to main display
 					display.state = DISPLAY_MAIN;
-					display.cursor_menu = CURSOR_MENU_SET;
+					display.cursor_menu = CURSOR_MENU_SET_TARGET;
 				}
 			}
 			else if (display.state == DISPLAY_SET_TARGET)
@@ -165,13 +202,29 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				else
 				{
 					display.state = DISPLAY_MENU;
-					display.cursor_menu = CURSOR_MENU_SET;
+					display.cursor_menu = CURSOR_MENU_SET_TARGET;
 				}
 
 			}
 			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
 			{
 				display.state = DISPLAY_SET_TARGET;
+			}
+			else if (display.state == DISPLAY_SET_HYSTERESIS)
+			{
+				if (display.cursor_set_hysteresis != CURSOR_SET_HYSTERESIS_BACK)
+				{
+					display.state = DISPLAY_SET_HYSTERESIS_CHOOSE;
+				}
+				else
+				{
+					display.state = DISPLAY_MENU;
+					display.cursor_menu = CURSOR_MENU_SET_TARGET;
+				}
+			}
+			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+			{
+				display.state = DISPLAY_SET_HYSTERESIS;
 			}
 			break;
 		}
@@ -215,12 +268,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   oled_init(&oled, &hi2c1, OLED_ADDR);
   encoder_init(&encoder, &htim2, GPIO_PIN_10);
+  control_init(&control);
+  display_init(&display);
   sht30.temp = 27.49024;
   sht30.hum = 10.80202;
-  sht30.expected_hum = 10.15;
-  sht30.expected_temp = 25.631;
-  display.state = DISPLAY_MAIN;
-  display.cursor_menu = CURSOR_MENU_SET;
   HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
@@ -231,7 +282,7 @@ int main(void)
 
 	  if (HAL_GetTick() - oled_tick >= 200)
 	  {
-		  display_task(&display, &oled, &sht30);
+		  display_task(&display, &oled, &sht30, &control);
 		  oled_tick = HAL_GetTick();
 	  }
     /* USER CODE END WHILE */

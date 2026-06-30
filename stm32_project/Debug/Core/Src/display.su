@@ -1,1 +1,2 @@
-../Core/Src/display.c:6:6:display_task	40	static
+../Core/Src/display.c:6:6:display_init	16	static
+../Core/Src/display.c:14:6:display_task	48	static

@@ -1,3 +1,4 @@
+"./Core/Src/control.o"
 "./Core/Src/display.o"
 "./Core/Src/encoder.o"
 "./Core/Src/font_8x12.o"

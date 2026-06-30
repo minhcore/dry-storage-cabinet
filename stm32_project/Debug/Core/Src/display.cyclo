@@ -1,1 +1,2 @@
-../Core/Src/display.c:6:6:display_task	20
+../Core/Src/display.c:6:6:display_init	1
+../Core/Src/display.c:14:6:display_task	33

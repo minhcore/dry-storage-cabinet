@@ -18,26 +18,26 @@ oled_status_e oled_init(oled_t* oled, I2C_HandleTypeDef* i2c, uint8_t address)
 	oled->address = address;
 	oled->buffer = oled_buffer;
 	static uint8_t init_buf[] = {
-//			0x20, 0x00,			// Set Horizontal Addressing Mode
-//			0x21, 0x00, 0x7F,	// Set Column Address from 0 to 127
-//			0x22, 0x00, 0x07,	// Set Page Address from 0 to 7
-//			0xa0,				// Set Segment Re-map
-//			0xc0,				// Set COM Output Scan Direction
-//			0xaf,				// Set Display ON
-//			0xa5				// Set Resume to RAM content display
-			0xa8, 0x3f, 		// Set Mux Ratio
-			0xd3, 0x00, 		// Set Display Offset
-			0x40, 				// Set Display Start Line
-			0xa1, 				// Set Segment re-map
-			0xc8, 				// Set COM Output Scan Direction
-			0xda, 0x12, 		// Set COM Pins hardware configuration
-			0x81, 0x7f, 		// Set Contrast Control
-			0xa4, 				// Display Entire Display On
-			0xa6, 				// Set Normal Display
-			0xd5, 0x80, 		// Set Osc Frequency
-			0x8d, 0x14, 		// Enable charge pump regulator
-			0x20, 0x20, 		// Set Horizontal Adressing Mode
-			0xaf 				// Display On
+			0x20, 0x00,			// Set Horizontal Addressing Mode
+			0x21, 0x00, 0x7F,	// Set Column Address from 0 to 127
+			0x22, 0x00, 0x07,	// Set Page Address from 0 to 7
+			0xa0,				// Set Segment Re-map
+			0xc0,				// Set COM Output Scan Direction
+			0xaf,				// Set Display ON
+			0xa4				// Set Resume to RAM content display
+//			0xa8, 0x3f, 		// Set Mux Ratio
+//			0xd3, 0x00, 		// Set Display Offset
+//			0x40, 				// Set Display Start Line
+//			0xa1, 				// Set Segment re-map
+//			0xc8, 				// Set COM Output Scan Directiond
+//			0xda, 0x12, 		// Set COM Pins hardware configuration
+//			0x81, 0x7f, 		// Set Contrast Control
+//			0xa4, 				// Display Entire Display On
+//			0xa6, 				// Set Normal Display
+//			0xd5, 0x80, 		// Set Osc Frequency
+//			0x8d, 0x14, 		// Enable charge pump regulator
+//			0x20, 0x20, 		// Set Horizontal Adressing Mode
+//			0xaf 				// Display On
 	};
 
 	status = HAL_I2C_Mem_Write(oled->i2c, oled->address, command_byte, I2C_MEMADD_SIZE_8BIT, init_buf, sizeof(init_buf), 100);
