@@ -1,0 +1,4 @@
+../Core/Src/sht30.c:5:16:sht30_init	40	static
+../Core/Src/sht30.c:18:6:sht30_config	16	static
+../Core/Src/sht30.c:23:16:sht30_get	40	static
+../Core/Src/sht30.c:60:6:sht30_calculate	16	static

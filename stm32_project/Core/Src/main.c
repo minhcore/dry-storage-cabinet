@@ -21,6 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <math.h>
+
 #include "uart.h"
 #include "encoder.h"
 #include "oled.h"
@@ -45,6 +47,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 I2C_HandleTypeDef hi2c1;
 
 TIM_HandleTypeDef htim2;
@@ -68,168 +72,169 @@ static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	if (GPIO_Pin == encoder.button_pin)
-	{
-		if (HAL_GetTick() - encoder.debounce_tick >= 200)
-		{
-			encoder.is_pressed_button = 1;
-			encoder.debounce_tick = HAL_GetTick();
-		}
-	}
-}
+//void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+//{
+//	if (GPIO_Pin == encoder.button_pin)
+//	{
+//		if (HAL_GetTick() - encoder.debounce_tick >= 200)
+//		{
+//			encoder.is_pressed_button = 1;
+//			encoder.debounce_tick = HAL_GetTick();
+//		}
+//	}
+//}
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	if (htim == &htim3)
-	{
-		encoder_status_t status;
-		status = encoder_read(&encoder);
-		switch(status)
-		{
-		case ENCODER_NONE:
-			break;
-		case ENCODER_SCROLL_UP:
-			if (display.state == DISPLAY_MENU)
-			{
-				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_SET_TARGET) ? CURSOR_MENU_EXIT : display.cursor_menu - 1;
-			}
-			else if (display.state == DISPLAY_SET_TARGET)
-			{
-				display.cursor_set_target = (display.cursor_set_target == CURSOR_SET_TARGET_TEMP) ? CURSOR_SET_TARGET_BACK : display.cursor_set_target - 1;
-			}
-			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
-			{
-				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
-				{
-					control.target_temp += 1;
-				}
-				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
-				{
-					control.target_hum += 1;
-				}
-
-				// T.B.D about safety min and max
-			}
-			else if (display.state == DISPLAY_SET_HYSTERESIS)
-			{
-				display.cursor_set_hysteresis = (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP) ? CURSOR_SET_HYSTERESIS_BACK : display.cursor_set_hysteresis - 1;
-			}
-			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
-			{
-				if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
-				{
-					control.temp_hysteresis += 1;
-				}
-				else if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
-				{
-					control.hum_hysteresis += 1;
-				}
-			}
-			break;
-		case ENCODER_SCROLL_DOWN:
-			if (display.state == DISPLAY_MENU)
-			{
-				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_EXIT) ? CURSOR_MENU_SET_TARGET : display.cursor_menu + 1;
-			}
-			else if (display.state == DISPLAY_SET_TARGET)
-			{
-				display.cursor_set_target = (display.cursor_set_target == CURSOR_SET_TARGET_BACK) ? CURSOR_SET_TARGET_TEMP : display.cursor_set_target + 1;
-			}
-			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
-			{
-				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
-				{
-					control.target_temp -= 1;
-				}
-				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
-				{
-					control.target_hum -= 1;
-				}
-
-				// T.B.D about safety min and max
-			}
-			else if (display.state == DISPLAY_SET_HYSTERESIS)
-			{
-				display.cursor_set_hysteresis = (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_BACK) ? CURSOR_SET_HYSTERESIS_TEMP : display.cursor_set_hysteresis + 1;
-			}
-			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
-			{
-				if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
-				{
-					control.temp_hysteresis -= 1;
-				}
-				else if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
-				{
-					control.hum_hysteresis -= 1;
-				}
-			}
-			break;
-		case ENCODER_PRESSED:
-			if (display.state == DISPLAY_MAIN) display.state = DISPLAY_MENU;
-			else if (display.state == DISPLAY_MENU)
-			{
-				if (display.cursor_menu == CURSOR_MENU_SET_TARGET)
-				{
-					display.state = DISPLAY_SET_TARGET;
-					display.cursor_set_target = CURSOR_SET_TARGET_TEMP;
-				}
-				else if (display.cursor_menu == CURSOR_MENU_SET_HYSTERESIS)
-				{
-					display.state = DISPLAY_SET_HYSTERESIS;
-					display.cursor_set_hysteresis = CURSOR_SET_HYSTERESIS_TEMP;
-				}
-				else if (display.cursor_menu == CURSOR_MENU_EXIT)
-				{
-					// back to main display
-					display.state = DISPLAY_MAIN;
-					display.cursor_menu = CURSOR_MENU_SET_TARGET;
-				}
-			}
-			else if (display.state == DISPLAY_SET_TARGET)
-			{
-				if (display.cursor_set_target != CURSOR_SET_TARGET_BACK)
-				{
-					display.state = DISPLAY_SET_TARGET_CHOOSE;
-				}
-				else
-				{
-					display.state = DISPLAY_MENU;
-					display.cursor_menu = CURSOR_MENU_SET_TARGET;
-				}
-
-			}
-			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
-			{
-				display.state = DISPLAY_SET_TARGET;
-			}
-			else if (display.state == DISPLAY_SET_HYSTERESIS)
-			{
-				if (display.cursor_set_hysteresis != CURSOR_SET_HYSTERESIS_BACK)
-				{
-					display.state = DISPLAY_SET_HYSTERESIS_CHOOSE;
-				}
-				else
-				{
-					display.state = DISPLAY_MENU;
-					display.cursor_menu = CURSOR_MENU_SET_TARGET;
-				}
-			}
-			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
-			{
-				display.state = DISPLAY_SET_HYSTERESIS;
-			}
-			break;
-		}
-	}
-}
+//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+//{
+//	if (htim == &htim3)
+//	{
+//		encoder_status_t status;
+//		status = encoder_read(&encoder);
+//		switch(status)
+//		{
+//		case ENCODER_NONE:
+//			break;
+//		case ENCODER_SCROLL_UP:
+//			if (display.state == DISPLAY_MENU)
+//			{
+//				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_SET_TARGET) ? CURSOR_MENU_EXIT : display.cursor_menu - 1;
+//			}
+//			else if (display.state == DISPLAY_SET_TARGET)
+//			{
+//				display.cursor_set_target = (display.cursor_set_target == CURSOR_SET_TARGET_TEMP) ? CURSOR_SET_TARGET_BACK : display.cursor_set_target - 1;
+//			}
+//			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
+//			{
+//				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
+//				{
+//					control.target_temp += 1;
+//				}
+//				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
+//				{
+//					control.target_hum += 1;
+//				}
+//
+//				// T.B.D about safety min and max
+//			}
+//			else if (display.state == DISPLAY_SET_HYSTERESIS)
+//			{
+//				display.cursor_set_hysteresis = (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP) ? CURSOR_SET_HYSTERESIS_BACK : display.cursor_set_hysteresis - 1;
+//			}
+//			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+//			{
+//				if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
+//				{
+//					control.temp_hysteresis += 1;
+//				}
+//				else if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
+//				{
+//					control.hum_hysteresis += 1;
+//				}
+//			}
+//			break;
+//		case ENCODER_SCROLL_DOWN:
+//			if (display.state == DISPLAY_MENU)
+//			{
+//				display.cursor_menu = (display.cursor_menu == CURSOR_MENU_EXIT) ? CURSOR_MENU_SET_TARGET : display.cursor_menu + 1;
+//			}
+//			else if (display.state == DISPLAY_SET_TARGET)
+//			{
+//				display.cursor_set_target = (display.cursor_set_target == CURSOR_SET_TARGET_BACK) ? CURSOR_SET_TARGET_TEMP : display.cursor_set_target + 1;
+//			}
+//			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
+//			{
+//				if (display.cursor_set_target == CURSOR_SET_TARGET_TEMP)
+//				{
+//					control.target_temp -= 1;
+//				}
+//				else if (display.cursor_set_target == CURSOR_SET_TARGET_HUM)
+//				{
+//					control.target_hum -= 1;
+//				}
+//
+//				// T.B.D about safety min and max
+//			}
+//			else if (display.state == DISPLAY_SET_HYSTERESIS)
+//			{
+//				display.cursor_set_hysteresis = (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_BACK) ? CURSOR_SET_HYSTERESIS_TEMP : display.cursor_set_hysteresis + 1;
+//			}
+//			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+//			{
+//				if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_TEMP)
+//				{
+//					control.temp_hysteresis -= 1;
+//				}
+//				else if (display.cursor_set_hysteresis == CURSOR_SET_HYSTERESIS_HUM)
+//				{
+//					control.hum_hysteresis -= 1;
+//				}
+//			}
+//			break;
+//		case ENCODER_PRESSED:
+//			if (display.state == DISPLAY_MAIN) display.state = DISPLAY_MENU;
+//			else if (display.state == DISPLAY_MENU)
+//			{
+//				if (display.cursor_menu == CURSOR_MENU_SET_TARGET)
+//				{
+//					display.state = DISPLAY_SET_TARGET;
+//					display.cursor_set_target = CURSOR_SET_TARGET_TEMP;
+//				}
+//				else if (display.cursor_menu == CURSOR_MENU_SET_HYSTERESIS)
+//				{
+//					display.state = DISPLAY_SET_HYSTERESIS;
+//					display.cursor_set_hysteresis = CURSOR_SET_HYSTERESIS_TEMP;
+//				}
+//				else if (display.cursor_menu == CURSOR_MENU_EXIT)
+//				{
+//					// back to main display
+//					display.state = DISPLAY_MAIN;
+//					display.cursor_menu = CURSOR_MENU_SET_TARGET;
+//				}
+//			}
+//			else if (display.state == DISPLAY_SET_TARGET)
+//			{
+//				if (display.cursor_set_target != CURSOR_SET_TARGET_BACK)
+//				{
+//					display.state = DISPLAY_SET_TARGET_CHOOSE;
+//				}
+//				else
+//				{
+//					display.state = DISPLAY_MENU;
+//					display.cursor_menu = CURSOR_MENU_SET_TARGET;
+//				}
+//
+//			}
+//			else if (display.state == DISPLAY_SET_TARGET_CHOOSE)
+//			{
+//				display.state = DISPLAY_SET_TARGET;
+//			}
+//			else if (display.state == DISPLAY_SET_HYSTERESIS)
+//			{
+//				if (display.cursor_set_hysteresis != CURSOR_SET_HYSTERESIS_BACK)
+//				{
+//					display.state = DISPLAY_SET_HYSTERESIS_CHOOSE;
+//				}
+//				else
+//				{
+//					display.state = DISPLAY_MENU;
+//					display.cursor_menu = CURSOR_MENU_SET_TARGET;
+//				}
+//			}
+//			else if (display.state == DISPLAY_SET_HYSTERESIS_CHOOSE)
+//			{
+//				display.state = DISPLAY_SET_HYSTERESIS;
+//			}
+//			break;
+//		}
+//	}
+//}
 /* USER CODE END 0 */
 
 /**
@@ -265,14 +270,14 @@ int main(void)
   MX_TIM2_Init();
   MX_USART2_UART_Init();
   MX_TIM3_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  oled_init(&oled, &hi2c1, OLED_ADDR);
-  encoder_init(&encoder, &htim2, GPIO_PIN_10);
-  control_init(&control);
-  display_init(&display);
-  sht30.temp = 27.49024;
-  sht30.hum = 10.80202;
-  HAL_TIM_Base_Start_IT(&htim3);
+//  if (sht30_init(&sht30, &hi2c1, SHT30_ADDR, high_repeatability_mode) == SHT30_ERROR) uart_send_string("FAIL");
+//  oled_init(&oled, &hi2c1, OLED_ADDR);
+//  encoder_init(&encoder, &htim2, GPIO_PIN_10);
+//  control_init(&control);
+//  display_init(&display);
+//  HAL_TIM_Base_Start_IT(&htim3);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -280,9 +285,15 @@ int main(void)
   while (1)
   {
 
-	  if (HAL_GetTick() - oled_tick >= 200)
+	  if (HAL_GetTick() - oled_tick >= 1000)
 	  {
-		  display_task(&display, &oled, &sht30, &control);
+		  HAL_ADC_Start(&hadc1);
+		  HAL_ADC_PollForConversion(&hadc1, 1000);
+		  uint32_t raw = HAL_ADC_GetValue(&hadc1);
+		  float r = 10000.0 * (float)raw / (4095.0 - (float)raw);
+		  float inv_t = (1.0 / 298.15) + (1.0 / 3950.0) * logf(r / 10000.0);
+		  uart_send_int((1.0 / inv_t) - 273.15);
+		  uart_send_string("\r\n");
 		  oled_tick = HAL_GetTick();
 	  }
     /* USER CODE END WHILE */
@@ -331,6 +342,58 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
