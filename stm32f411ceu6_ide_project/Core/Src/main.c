@@ -26,6 +26,8 @@
 #include "ntc.h"
 #include "encoder.h"
 #include "control.h"
+#include "display.h"
+#include "fsm.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -68,7 +70,7 @@ control_t control = {0};
 uint32_t oled_tick;
 uint32_t sensor_tick;
 uint32_t cold_fan_tick;
-uint32_t i = 50;
+float i = 50.0;
 uint8_t peltier_on = 0;
 uint8_t cold_fan_on = 0;
 /* USER CODE END PV */
@@ -183,9 +185,12 @@ int main(void)
   control_init(&control, &htim3, TIM_CHANNEL_2,
 		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
 		  STATUS_PORT, ERROR_LED, STATUS_PORT, NORMAL_LED,
-		  50.0, 0.5, 0.5, 6, 10);
+		  50.0, 0.5, 0.5, 4.5, 7);
   //
 
+  // FSM INIT
+  fsm_init();
+  //
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -194,19 +199,13 @@ int main(void)
   {
 	  if ((HAL_GetTick() - oled_tick) >= 200)
 	  {
-		  oled_clear_display(&oled);
 
-		  oled_draw_int(&oled, sht30.temp*100, 0, 0);
-		  oled_draw_int(&oled, sht30.hum*100, 2, 0);
+		  display_update(RUNNING, &oled, &sht30, &control);
 
-		  oled_draw_int(&oled, ntc.temp*100, 4, 0);
-
-		  oled_draw_int(&oled, i, 6, 0);
-
-		  oled_draw_string(&oled, "max: ", 0, 50);
-		  oled_draw_int(&oled, control.max_hum * 100, 0, 91);
-		  oled_draw_string(&oled, "min: ", 2, 50);
-		  oled_draw_int(&oled, control.min_hum * 100, 2, 91);
+		  oled_draw_int(&oled, ntc.temp*100, 6, 0);
+		  oled_draw_int(&oled, i, 6, 40);
+		  oled_draw_int(&oled, control.max_hum * 100, 6, 60);
+		  oled_draw_int(&oled, control.min_hum * 100, 6, 95);
 
 		  oled_send_buffer(&oled);
 		  oled_tick = HAL_GetTick();
