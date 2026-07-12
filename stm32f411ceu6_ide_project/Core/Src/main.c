@@ -25,6 +25,7 @@
 #include "sht30.h"
 #include "ntc.h"
 #include "encoder.h"
+#include "control.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,7 +35,14 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define STATUS_PORT GPIOB
+#define ERROR_LED GPIO_PIN_13
+#define NORMAL_LED GPIO_PIN_14
+#define BUZZER GIO_PIN_15
 
+#define DRIVER_PORT	GPIOA
+#define PELTIER_PIN GPIO_PIN_2
+#define HOT_FAN_PIN GPIO_PIN_3
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -56,10 +64,13 @@ oled_t oled = {0};
 sht30_t sht30 = {0};
 ntc_t ntc = {0};
 encoder_t encoder = {0};
+control_t control = {0};
 uint32_t oled_tick;
 uint32_t sensor_tick;
 uint32_t cold_fan_tick;
-uint32_t i = 0;
+uint32_t i = 50;
+uint8_t peltier_on = 0;
+uint8_t cold_fan_on = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -102,13 +113,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 			i--;
 			break;
 		case ENCODER_PRESSED:
-			i = 76;
+			HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_15);
 			break;
 		case ENCODER_NONE:
 			break;
 		}
 	}
 }
+
 
 /* USER CODE END 0 */
 
@@ -167,13 +179,11 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim4);
   //
 
-  // COLD FAN
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-  //
-
-  // HOT FAN & PELTIER
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_2, 1);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3, 1);
+  // POWER DRIVER
+  control_init(&control, &htim3, TIM_CHANNEL_2,
+		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
+		  STATUS_PORT, ERROR_LED, STATUS_PORT, NORMAL_LED,
+		  50.0, 0.5, 0.5, 6, 10);
   //
 
   /* USER CODE END 2 */
@@ -186,12 +196,17 @@ int main(void)
 	  {
 		  oled_clear_display(&oled);
 
-		  oled_draw_int(&oled, sht30.temp, 0, 0);
-		  oled_draw_int(&oled, sht30.hum, 2, 0);
+		  oled_draw_int(&oled, sht30.temp*100, 0, 0);
+		  oled_draw_int(&oled, sht30.hum*100, 2, 0);
 
-		  oled_draw_int(&oled, ntc.temp, 4, 0);
+		  oled_draw_int(&oled, ntc.temp*100, 4, 0);
 
 		  oled_draw_int(&oled, i, 6, 0);
+
+		  oled_draw_string(&oled, "max: ", 0, 50);
+		  oled_draw_int(&oled, control.max_hum * 100, 0, 91);
+		  oled_draw_string(&oled, "min: ", 2, 50);
+		  oled_draw_int(&oled, control.min_hum * 100, 2, 91);
 
 		  oled_send_buffer(&oled);
 		  oled_tick = HAL_GetTick();
@@ -205,13 +220,11 @@ int main(void)
 		  ntc_read_adc(&ntc);
 		  ntc_calculate_temp(&ntc);
 
-		  sensor_tick = HAL_GetTick();
-	  }
+		  control.target_hum = i;
 
-	  if ((HAL_GetTick() - cold_fan_tick) >= 2000)
-	  {
-		  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, (i * 999) / 100);
-		  cold_fan_tick = HAL_GetTick();
+		  control_update(&control, &ntc, sht30.hum);
+
+		  sensor_tick = HAL_GetTick();
 	  }
 
     /* USER CODE END WHILE */

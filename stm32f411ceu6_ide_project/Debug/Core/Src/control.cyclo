@@ -1,1 +1,4 @@
 ../Core/Src/control.c:3:6:control_init	1
+../Core/Src/control.c:36:13:control_peltier_hot_fan	1
+../Core/Src/control.c:41:13:control_cold_fan	4
+../Core/Src/control.c:46:6:control_update	9
