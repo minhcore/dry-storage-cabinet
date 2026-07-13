@@ -1,7 +1,7 @@
 ../Core/Src/oled.c:14:15:oled_init	48	static
-../Core/Src/oled.c:35:6:oled_clear_display	16	static
-../Core/Src/oled.c:40:15:oled_send_buffer	48	static
-../Core/Src/oled.c:53:6:oled_draw_char	32	static
-../Core/Src/oled.c:85:6:oled_draw_string	32	static
-../Core/Src/oled.c:97:6:oled_draw_int	64	static
-../Core/Src/oled.c:123:6:oled_turn_all	16	static
+../Core/Src/oled.c:36:6:oled_clear_display	16	static
+../Core/Src/oled.c:41:15:oled_send_buffer	40	static
+../Core/Src/oled.c:54:6:oled_draw_char	32	static
+../Core/Src/oled.c:86:6:oled_draw_string	32	static
+../Core/Src/oled.c:98:6:oled_draw_int	64	static
+../Core/Src/oled.c:124:6:oled_turn_all	16	static

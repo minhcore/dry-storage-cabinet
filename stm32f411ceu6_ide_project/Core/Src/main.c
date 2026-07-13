@@ -73,6 +73,7 @@ uint32_t cold_fan_tick;
 float i = 50.0;
 uint8_t peltier_on = 0;
 uint8_t cold_fan_on = 0;
+volatile event_e event;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,13 +110,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 		switch(encoder.status)
 		{
 		case ENCODER_SCROLL_UP:
-			i++;
+			event = UP;
 			break;
 		case ENCODER_SCROLL_DOWN:
-			i--;
+			event = DOWN;
 			break;
 		case ENCODER_PRESSED:
-			HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_15);
+			event = PRESSED;
 			break;
 		case ENCODER_NONE:
 			break;
@@ -197,21 +198,27 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if ((HAL_GetTick() - oled_tick) >= 200)
+	  __disable_irq();
+	  event_e local_event = event;
+	  event = NONE;
+	  __enable_irq();
+	  fsm_run(local_event);
+	  state_e current_state = fsm_get();
+	  if ((HAL_GetTick() - oled_tick) >= 50 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 
-		  display_update(RUNNING, &oled, &sht30, &control);
+		  display_update(current_state, &oled, &sht30, &control);
 
-		  oled_draw_int(&oled, ntc.temp*100, 6, 0);
-		  oled_draw_int(&oled, i, 6, 40);
-		  oled_draw_int(&oled, control.max_hum * 100, 6, 60);
-		  oled_draw_int(&oled, control.min_hum * 100, 6, 95);
+//		  oled_draw_int(&oled, ntc.temp*100, 6, 0);
+//		  oled_draw_int(&oled, i, 6, 40);
+//		  oled_draw_int(&oled, control.max_hum * 100, 6, 60);
+//		  oled_draw_int(&oled, control.min_hum * 100, 6, 95);
 
-		  oled_send_buffer(&oled);
+//		  oled_send_buffer(&oled);
 		  oled_tick = HAL_GetTick();
 	  }
 
-	  if ((HAL_GetTick() - sensor_tick) >= 500)
+	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  sht30_get(&sht30);
 		  sht30_calculate(&sht30);
@@ -388,11 +395,11 @@ static void MX_TIM2_Init(void)
   sConfig.IC1Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC1Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC1Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC1Filter = 11;
+  sConfig.IC1Filter = 15;
   sConfig.IC2Polarity = TIM_ICPOLARITY_RISING;
   sConfig.IC2Selection = TIM_ICSELECTION_DIRECTTI;
   sConfig.IC2Prescaler = TIM_ICPSC_DIV1;
-  sConfig.IC2Filter = 11;
+  sConfig.IC2Filter = 15;
   if (HAL_TIM_Encoder_Init(&htim2, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -489,7 +496,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 15;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 4999;
+  htim4.Init.Period = 1999;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)

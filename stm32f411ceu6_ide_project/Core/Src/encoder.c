@@ -18,17 +18,17 @@ void encoder_read(encoder_t* encoder)
 
 	encoder->current_value = __HAL_TIM_GET_COUNTER(encoder->tim);
 
-	int32_t diff = encoder->current_value - encoder->last_value;
+	int16_t diff = (int16_t)(encoder->current_value - encoder->last_value);
 
 	if (diff >= 4)
 	{
 		status = ENCODER_SCROLL_UP;
-		encoder->last_value = encoder->current_value;
+		encoder->last_value += 4;
 	}
 	else if (diff <= -4)
 	{
 		status = ENCODER_SCROLL_DOWN;
-		encoder->last_value = encoder->current_value;
+		encoder->last_value -= 4;
 	}
 	else if (encoder->is_pressed_button)
 	{

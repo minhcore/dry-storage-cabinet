@@ -17,6 +17,7 @@ oled_status_e oled_init(oled_t* oled, I2C_HandleTypeDef* i2c, uint8_t address)
 	oled->i2c = i2c;
 	oled->address = address;
 	oled->buffer = oled_buffer;
+
 	static uint8_t init_buf[] = {
 			0x20, 0x00,			// Set Horizontal Addressing Mode
 			0x21, 0x00, 0x7F,	// Set Column Address from 0 to 127
@@ -45,7 +46,7 @@ oled_status_e oled_send_buffer(oled_t* oled)
 	status = HAL_I2C_Master_Transmit(oled->i2c, oled->address, set_column_page, sizeof(set_column_page), 100);
 	if (status != HAL_OK) return OLED_ERROR;
 
-	status = HAL_I2C_Mem_Write(oled->i2c, oled->address, (uint8_t)(data_byte), I2C_MEMADD_SIZE_8BIT, oled->buffer, OLED_BUFFER_SIZE, 1000);
+	status = HAL_I2C_Mem_Write_IT(oled->i2c, oled->address, (uint8_t)(data_byte), I2C_MEMADD_SIZE_8BIT, oled->buffer, OLED_BUFFER_SIZE);
 	if (status != HAL_OK) return OLED_ERROR;
 	return OLED_OK;
 }

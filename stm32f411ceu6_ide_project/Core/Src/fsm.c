@@ -2,12 +2,12 @@
 #include <stdint.h>
 
 static const transition_t fsm_table[] = {
-		{RUNNING, PRESSED, SET_HUM},
+		{RUNNING, PRESSED, SET_TARGET},
 		{RUNNING, ERROR_HAPPEN, ERROR_HANDLE},
 
-		{SET_HUM, DOWN, SET_ALARM},
-		{SET_HUM, PRESSED, SET_HUM_IDLE},
-		{SET_ALARM, UP, SET_HUM},
+		{SET_TARGET, DOWN, SET_ALARM},
+		{SET_TARGET, PRESSED, SET_HUM_IDLE},
+		{SET_ALARM, UP, SET_TARGET},
 		{SET_ALARM, DOWN, MENU_EXIT},
 		{SET_ALARM, PRESSED, SET_ALARM_TEMP},
 		{MENU_EXIT, UP, SET_ALARM},
@@ -17,7 +17,7 @@ static const transition_t fsm_table[] = {
 		{SET_HUM_IDLE, PRESSED, SET_HUM_CHOOSE},
 		{SET_HUM_CHOOSE, PRESSED, SET_HUM_IDLE},
 		{SET_HUM_BACK, UP, SET_HUM_IDLE},
-		{SET_HUM_BACK, PRESSED, SET_HUM},
+		{SET_HUM_BACK, PRESSED, SET_TARGET},
 
 		{SET_ALARM_TEMP, DOWN, SET_ALARM_HUM},
 		{SET_ALARM_TEMP, PRESSED, SET_ALARM_CHOOSE_TEMP},
@@ -31,7 +31,7 @@ static const transition_t fsm_table[] = {
 		{SET_ALARM_BUZZER, PRESSED, SET_ALARM_CHOOSE_BUZZER},
 		{SET_ALARM_CHOOSE_BUZZER, PRESSED, SET_ALARM_BUZZER},
 		{SET_ALARM_BACK, UP, SET_ALARM_BUZZER},
-		{SET_ALARM_BACK, PRESSED, SET_HUM},
+		{SET_ALARM_BACK, PRESSED, SET_TARGET},
 
 };
 
@@ -57,4 +57,9 @@ void fsm_run(event_e current_event)
 			}
 		}
 	}
+}
+
+state_e fsm_get(void)
+{
+	return current_state;
 }

@@ -8,7 +8,7 @@ typedef enum
 	ERROR_HANDLE,
 
 	// Menu setting state
-	SET_HUM,
+	SET_TARGET,
 	SET_ALARM,
 	MENU_EXIT,
 
@@ -46,5 +46,6 @@ typedef struct
 
 void fsm_init(void);
 void fsm_run(event_e current_event);
+state_e fsm_get(void);
 
 #endif
