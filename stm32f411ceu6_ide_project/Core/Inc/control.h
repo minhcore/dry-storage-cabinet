@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "stm32f4xx.h"
 #include "ntc.h"
+#include "sht30.h"
 
 #define COLD_FAN_ARR 999
 
@@ -28,14 +29,13 @@ typedef struct
 
 	// value for control
 	float target_hum;
-	float hum_off_offset;
-	float hum_on_offset;
-	float cold_fan_on_temp;
-	float cold_fan_off_temp;
+	float filtered_hum;
+	float ema_alpha;
+	float prev_hum;
+	float k_factor_on;
+	float k_factor_off;
+	float dew_point_temp;
 
-	float max_hum;
-	float min_hum;
-	bool stable;
 } control_t;
 
 void control_init(control_t* control, TIM_HandleTypeDef* tim, uint32_t tim_channel,
@@ -43,8 +43,8 @@ void control_init(control_t* control, TIM_HandleTypeDef* tim, uint32_t tim_chann
 				GPIO_TypeDef* hot_fan_port, uint16_t hot_fan_pin,
 				GPIO_TypeDef* error_led_port, uint16_t error_led_pin,
 				GPIO_TypeDef* normal_led_port, uint16_t normal_led_pin,
-				float target_hum, float hum_off_offset, float hum_on_offset,
-				float cold_fan_on_temp, float cold_fan_off_temp);
-void control_update(control_t *control, ntc_t* ntc, float cur_hum);
+				float target_hum);
+void control_update(control_t *control, ntc_t* ntc, sht30_t* sht30);
+void control_filter_hum(control_t *control, sht30_t* sht30);
 
 #endif

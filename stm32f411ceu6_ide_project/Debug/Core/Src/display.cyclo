@@ -1,4 +1,5 @@
-../Core/Src/display.c:4:13:display_running	3
-../Core/Src/display.c:44:13:draw_cursor	1
-../Core/Src/display.c:49:13:menu_display	1
-../Core/Src/display.c:60:6:display_update	5
+../Core/Src/display.c:7:13:display_running	3
+../Core/Src/display.c:46:13:draw_cursor	1
+../Core/Src/display.c:51:13:menu_display	1
+../Core/Src/display.c:61:13:set_hum_display	5
+../Core/Src/display.c:86:6:display_update	8

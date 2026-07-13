@@ -69,8 +69,7 @@ encoder_t encoder = {0};
 control_t control = {0};
 uint32_t oled_tick;
 uint32_t sensor_tick;
-uint32_t cold_fan_tick;
-float i = 50.0;
+uint32_t control_tick;
 uint8_t peltier_on = 0;
 uint8_t cold_fan_on = 0;
 volatile event_e event;
@@ -186,7 +185,7 @@ int main(void)
   control_init(&control, &htim3, TIM_CHANNEL_2,
 		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
 		  STATUS_PORT, ERROR_LED, STATUS_PORT, NORMAL_LED,
-		  50.0, 0.5, 0.5, 4.5, 7);
+		  50.0);
   //
 
   // FSM INIT
@@ -204,21 +203,27 @@ int main(void)
 	  __enable_irq();
 	  fsm_run(local_event);
 	  state_e current_state = fsm_get();
+
+	  if (current_state == SET_HUM_CHOOSE)
+	  {
+		  if (local_event == UP)
+		  {
+			  control.target_hum = (control.target_hum == 60) ? 60 : control.target_hum + 1;
+		  }
+		  else if (local_event == DOWN)
+		  {
+			  control.target_hum = (control.target_hum == 35) ? 35 : control.target_hum - 1;
+		  }
+	  }
+
 	  if ((HAL_GetTick() - oled_tick) >= 50 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
-
 		  display_update(current_state, &oled, &sht30, &control);
 
-//		  oled_draw_int(&oled, ntc.temp*100, 6, 0);
-//		  oled_draw_int(&oled, i, 6, 40);
-//		  oled_draw_int(&oled, control.max_hum * 100, 6, 60);
-//		  oled_draw_int(&oled, control.min_hum * 100, 6, 95);
-
-//		  oled_send_buffer(&oled);
 		  oled_tick = HAL_GetTick();
 	  }
 
-	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
+	  if (((HAL_GetTick() - sensor_tick) >= 200) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  sht30_get(&sht30);
 		  sht30_calculate(&sht30);
@@ -226,13 +231,17 @@ int main(void)
 		  ntc_read_adc(&ntc);
 		  ntc_calculate_temp(&ntc);
 
-		  control.target_hum = i;
-
-		  control_update(&control, &ntc, sht30.hum);
+		  control_filter_hum(&control, &sht30);
 
 		  sensor_tick = HAL_GetTick();
 	  }
 
+	  if ((HAL_GetTick() - control_tick) >= 1000)
+	  {
+		  control_update(&control, &ntc, &sht30);
+
+		  control_tick = HAL_GetTick();
+	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

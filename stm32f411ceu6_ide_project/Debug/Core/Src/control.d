@@ -31,7 +31,7 @@ Core/Src/control.o: ../Core/Src/control.c ../Core/Inc/control.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pwr_ex.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h \
- ../Core/Inc/ntc.h
+ ../Core/Inc/ntc.h ../Core/Inc/sht30.h
 ../Core/Inc/control.h:
 ../Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h:
 ../Drivers/CMSIS/Device/ST/STM32F4xx/Include/stm32f411xe.h:
@@ -66,3 +66,4 @@ Core/Src/control.o: ../Core/Src/control.c ../Core/Inc/control.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_tim_ex.h:
 ../Core/Inc/ntc.h:
+../Core/Inc/sht30.h:
