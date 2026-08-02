@@ -2,4 +2,4 @@
 ../Core/Src/display.c:46:13:draw_cursor	1
 ../Core/Src/display.c:51:13:menu_display	1
 ../Core/Src/display.c:61:13:set_hum_display	5
-../Core/Src/display.c:86:6:display_update	8
+../Core/Src/display.c:112:6:display_update	8

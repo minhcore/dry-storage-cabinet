@@ -28,6 +28,7 @@
 #include "control.h"
 #include "display.h"
 #include "fsm.h"
+#include "uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,6 +62,8 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 
+UART_HandleTypeDef huart1;
+
 /* USER CODE BEGIN PV */
 oled_t oled = {0};
 sht30_t sht30 = {0};
@@ -70,9 +73,12 @@ control_t control = {0};
 uint32_t oled_tick;
 uint32_t sensor_tick;
 uint32_t control_tick;
+uint32_t uart_tick;
 uint8_t peltier_on = 0;
 uint8_t cold_fan_on = 0;
 volatile event_e event;
+state_e current_state;
+event_e local_event;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,6 +89,7 @@ static void MX_I2C1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -123,6 +130,20 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 	}
 }
 
+void menu_setting(void)
+{
+	if (current_state == SET_HUM_CHOOSE)
+	{
+		if (local_event == UP)
+		{
+			control.target_hum = (control.target_hum == 60) ? 60 : control.target_hum + 1;
+		}
+		else if (local_event == DOWN)
+		{
+			control.target_hum = (control.target_hum == 35) ? 35 : control.target_hum - 1;
+		}
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -160,6 +181,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_TIM4_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
   // OLED
@@ -198,23 +220,13 @@ int main(void)
   while (1)
   {
 	  __disable_irq();
-	  event_e local_event = event;
+	  local_event = event;
 	  event = NONE;
 	  __enable_irq();
 	  fsm_run(local_event);
-	  state_e current_state = fsm_get();
+	  current_state = fsm_get();
 
-	  if (current_state == SET_HUM_CHOOSE)
-	  {
-		  if (local_event == UP)
-		  {
-			  control.target_hum = (control.target_hum == 60) ? 60 : control.target_hum + 1;
-		  }
-		  else if (local_event == DOWN)
-		  {
-			  control.target_hum = (control.target_hum == 35) ? 35 : control.target_hum - 1;
-		  }
-	  }
+	  menu_setting();
 
 	  if ((HAL_GetTick() - oled_tick) >= 50 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
@@ -223,7 +235,7 @@ int main(void)
 		  oled_tick = HAL_GetTick();
 	  }
 
-	  if (((HAL_GetTick() - sensor_tick) >= 200) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
+	  if (((HAL_GetTick() - sensor_tick) >= 1000) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  sht30_get(&sht30);
 		  sht30_calculate(&sht30);
@@ -231,18 +243,54 @@ int main(void)
 		  ntc_read_adc(&ntc);
 		  ntc_calculate_temp(&ntc);
 
-		  control_filter_hum(&control, &sht30);
-
 		  sensor_tick = HAL_GetTick();
 	  }
 
 	  if ((HAL_GetTick() - control_tick) >= 1000)
 	  {
+		  control_filter_hum(&control, &sht30);
 		  control_update(&control, &ntc, &sht30);
 
 		  control_tick = HAL_GetTick();
 	  }
-    /* USER CODE END WHILE */
+
+	  if ((HAL_GetTick() - uart_tick) >= 500)
+	  {
+		  uart_send_int(HAL_GetTick());
+		  uart_send_char(',');
+		  uart_send_int(sht30.hum*100);
+		  uart_send_char(',');
+		  uart_send_int(control.filtered_hum*100);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_current_tick);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_prev_tick);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_v*100);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_turn_on*100);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_turn_off*100);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_peltier);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_cold_fan);
+		  uart_send_char(',');
+		  uart_send_int(ntc.temp*100);
+		  uart_send_char(',');
+		  uart_send_int(control.debug_dewpoint*100);
+
+		  // new one
+		  uart_send_char(',');
+		  uart_send_int(control.cycle_extreme_hum*100);
+		  uart_send_char(',');
+		  uart_send_int(control.overshoot_on_learned*100);
+		  uart_send_char(',');
+		  uart_send_int(control.overshoot_off_learned*100);
+		  uart_send_string("\r\n");
+		  uart_tick = HAL_GetTick();
+	  }
+	  /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -526,6 +574,39 @@ static void MX_TIM4_Init(void)
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
 
 }
 

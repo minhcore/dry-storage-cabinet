@@ -83,6 +83,32 @@ static void set_hum_display(oled_t* oled, control_t* control, uint8_t tick, uint
 	}
 }
 
+//static void set_alarm_display_1(oled_t* oled, control_t* control, uint8_t cursor)
+//{
+//	uint8_t current_x = 16;
+//	oled_draw_string(oled, "SET ALARM:", 0, 16);
+//	oled_draw_string(oled, "1.K_on: ", 2, current_x);
+//	current_x += strlen("1.K_on: ") * 8;
+//	oled_draw_int(oled, control->k_factor_on, 2, current_x);
+//	current_x = 16;
+//	oled_draw_string(oled, "2.K_off: ", 4, current_x);
+//	current_x += strlen("2.K_on: ") * 8;
+//	oled_draw_int(oled, control->k_factor_off, 4, current_x);
+//	current_x = 16;
+//	oled_draw_string(oled, "3.ema: ", 6, current_x);
+//	current_x += strlen("3.ema: ") * 8;
+//	oled_draw_int(oled, control->ema_alpha*10, 6, current_x);
+//	draw_cursor(oled, cursor);
+//
+//}
+//
+//static void set_alarm_display_2(oled_t* oled, control_t* control, uint8_t cursor)
+//{
+//	oled_draw_string(oled, "SET ALARM:", 0, 16);
+//	oled_draw_string(oled, "4.Back", 2, 16);
+//	draw_cursor(oled, cursor);
+//}
+
 void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control_t* control)
 {
 
@@ -111,6 +137,27 @@ void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control
 	case SET_HUM_BACK:
 		set_hum_display(oled, control, 0, 4);
 		break;
+//	case SET_ALARM_TEMP:
+//		set_alarm_display_1(oled, control, 2);
+//		break;
+//	case SET_ALARM_HUM:
+//		set_alarm_display_1(oled, control, 4);
+//		break;
+//	case SET_ALARM_CHOOSE_TEMP:
+//		set_alarm_display_1(oled, control, 2);
+//		break;
+//	case SET_ALARM_CHOOSE_HUM:
+//		set_alarm_display_1(oled, control, 4);
+//		break;
+//	case SET_ALARM_BUZZER:
+//		set_alarm_display_1(oled, control, 6);
+//		break;
+//	case SET_ALARM_CHOOSE_BUZZER:
+//		set_alarm_display_1(oled, control, 6);
+//		break;
+//	case SET_ALARM_BACK:
+//		set_alarm_display_2(oled, control, 2);
+//		break;
 	}
 	oled_send_buffer(oled);
 }
