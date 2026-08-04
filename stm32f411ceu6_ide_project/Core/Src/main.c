@@ -235,7 +235,7 @@ int main(void)
 		  oled_tick = HAL_GetTick();
 	  }
 
-	  if (((HAL_GetTick() - sensor_tick) >= 1000) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
+	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  sht30_get(&sht30);
 		  sht30_calculate(&sht30);
@@ -246,7 +246,7 @@ int main(void)
 		  sensor_tick = HAL_GetTick();
 	  }
 
-	  if ((HAL_GetTick() - control_tick) >= 1000)
+	  if ((HAL_GetTick() - control_tick) >= 500)
 	  {
 		  control_filter_hum(&control, &sht30);
 		  control_update(&control, &ntc, &sht30);
@@ -262,12 +262,6 @@ int main(void)
 		  uart_send_char(',');
 		  uart_send_int(control.filtered_hum*100);
 		  uart_send_char(',');
-		  uart_send_int(control.debug_current_tick);
-		  uart_send_char(',');
-		  uart_send_int(control.debug_prev_tick);
-		  uart_send_char(',');
-		  uart_send_int(control.debug_v*100);
-		  uart_send_char(',');
 		  uart_send_int(control.debug_turn_on*100);
 		  uart_send_char(',');
 		  uart_send_int(control.debug_turn_off*100);
@@ -279,14 +273,26 @@ int main(void)
 		  uart_send_int(ntc.temp*100);
 		  uart_send_char(',');
 		  uart_send_int(control.debug_dewpoint*100);
-
-		  // new one
 		  uart_send_char(',');
 		  uart_send_int(control.cycle_extreme_hum*100);
 		  uart_send_char(',');
 		  uart_send_int(control.overshoot_on_learned*100);
 		  uart_send_char(',');
 		  uart_send_int(control.overshoot_off_learned*100);
+		  uart_send_char(',');
+		  uart_send_int(control.last_cycle_duration_ms);
+		  uart_send_char(',');
+		  uart_send_int(control.phase_reversed);
+		  uart_send_char(',');
+		  uart_send_int(sht30.temp*100);
+		  uart_send_char(',');
+		  uart_send_int(control.target_hum*100);
+		  uart_send_char(',');
+		  uart_send_int(control.reversal_delta*100);
+		  uart_send_char(',');
+		  uart_send_int(control.cold_fan_used_this_phase);
+		  uart_send_char(',');
+		  uart_send_int(control.state_elapsed_ms);
 		  uart_send_string("\r\n");
 		  uart_tick = HAL_GetTick();
 	  }
