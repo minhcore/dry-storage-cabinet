@@ -1,6 +1,8 @@
-../Core/Src/control.c:7:6:control_init	1
-../Core/Src/control.c:74:13:control_peltier_output	1
-../Core/Src/control.c:84:13:control_cold_fan	4
-../Core/Src/control.c:92:14:dew_point_calculate	1
-../Core/Src/control.c:102:6:control_update	31
-../Core/Src/control.c:351:6:control_filter_hum	1
+../Core/Src/control.c:4:26:control_get_profile	3
+../Core/Src/control.c:36:13:control_peltier_output	1
+../Core/Src/control.c:46:13:control_cold_fan_output	4
+../Core/Src/control.c:56:13:control_set_peltier	2
+../Core/Src/control.c:79:13:control_set_cold_fan	2
+../Core/Src/control.c:95:14:dew_point_calculate	3
+../Core/Src/control.c:120:6:control_init	1
+../Core/Src/control.c:191:6:control_update	28

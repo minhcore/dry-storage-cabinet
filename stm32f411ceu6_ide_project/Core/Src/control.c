@@ -1,8 +1,121 @@
 #include "control.h"
 #include <math.h>
 
-/* Timestamp of the most recent Peltier state transition. */
-static uint32_t last_state_tick;
+static control_profile_t control_get_profile(float target_hum)
+{
+    control_profile_t profile;
+
+    if (target_hum <= 40.0f)
+    {
+        profile.on_advance = LOW_ON_ADVANCE;
+        profile.off_advance = LOW_OFF_ADVANCE;
+        profile.min_on_ms = LOW_MIN_ON_MS;
+        profile.min_off_ms = LOW_MIN_OFF_MS;
+        profile.id = 0U;
+    }
+    else if (target_hum <= 50.0f)
+    {
+        profile.on_advance = MID_ON_ADVANCE;
+        profile.off_advance = MID_OFF_ADVANCE;
+        profile.min_on_ms = MID_MIN_ON_MS;
+        profile.min_off_ms = MID_MIN_OFF_MS;
+        profile.id = 1U;
+    }
+    else
+    {
+        profile.on_advance = HIGH_ON_ADVANCE;
+        profile.off_advance = HIGH_OFF_ADVANCE;
+        profile.min_on_ms = HIGH_MIN_ON_MS;
+        profile.min_off_ms = HIGH_MIN_OFF_MS;
+        profile.id = 2U;
+    }
+
+    return profile;
+}
+
+static void control_peltier_output(control_t *control)
+{
+    HAL_GPIO_WritePin(
+            control->peltier_port,
+            control->peltier_pin,
+            control->peltier_on
+                    ? GPIO_PIN_SET
+                    : GPIO_PIN_RESET);
+}
+
+static void control_cold_fan_output(
+        control_t *control,
+        uint8_t pwm)
+{
+    __HAL_TIM_SET_COMPARE(
+            control->tim,
+            control->tim_channel,
+            (pwm * COLD_FAN_ARR) / 100U);
+}
+
+static void control_set_peltier(
+        control_t *control,
+        bool on,
+        uint32_t current_tick)
+{
+    if (control->peltier_on == on)
+    {
+        return;
+    }
+
+    control->peltier_on = on;
+    /* Kept synchronized because this legacy field is still in control.h. */
+    control->peltier_hot_fan_on = on;
+    control->last_state_tick = current_tick;
+
+    HAL_GPIO_WritePin(
+            control->error_led_port,
+            control->error_led_pin,
+            on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    control_peltier_output(control);
+}
+
+static void control_set_cold_fan(
+        control_t *control,
+        bool on)
+{
+    control->cold_fan_on = on;
+
+    control_cold_fan_output(
+            control,
+            on ? 50U : 0U);
+
+    HAL_GPIO_WritePin(
+            control->normal_led_port,
+            control->normal_led_pin,
+            on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+static float dew_point_calculate(const sht30_t *sht30)
+{
+    /* Magnus-Tetens approximation. */
+    const float a = 17.27f;
+    const float b = 237.3f;
+
+    float rh = sht30->hum;
+
+    /* Protect logf() if the sensor temporarily reports an invalid value. */
+    if (rh < 0.1f)
+    {
+        rh = 0.1f;
+    }
+    else if (rh > 100.0f)
+    {
+        rh = 100.0f;
+    }
+
+    float gamma =
+            (a * sht30->temp) / (b + sht30->temp)
+            + logf(rh / 100.0f);
+
+    return (b * gamma) / (a - gamma);
+}
 
 void control_init(
         control_t *control,
@@ -35,68 +148,44 @@ void control_init(
 
     control->target_hum = target_hum;
 
-    control->overshoot_off_learned = OVERSHOOT_MIN_MARGIN;
-    control->overshoot_on_learned = OVERSHOOT_MIN_MARGIN;
+    control->peltier_on = false;
+    control->peltier_hot_fan_on = false;
+    control->cold_fan_on = false;
+    control->control_started = false;
 
-    control->cycle_extreme_hum = control->filtered_hum;
-    control->learning_started = false;
-
-    /*
-     * Allow the first startup transition. After that, every transition
-     * requires a real peak/trough reversal.
-     */
-    control->phase_reversed = true;
-
-    control->last_cycle_duration_ms = 0U;
+    control->last_state_tick = HAL_GetTick();
     control->state_elapsed_ms = 0U;
-    control->reversal_delta = 0.0f;
-    control->cold_fan_used_this_phase = false;
+
+    control_profile_t profile =
+            control_get_profile(target_hum);
+
+    control->debug_turn_on =
+            target_hum - profile.on_advance;
+    control->debug_turn_off =
+            target_hum + profile.off_advance;
+    control->debug_dewpoint = 0.0f;
 
     control->debug_peltier = 0U;
     control->debug_cold_fan = 0U;
-    control->debug_turn_on =
-            target_hum - control->overshoot_on_learned;
-    control->debug_turn_off =
-            target_hum + control->overshoot_off_learned;
-    control->debug_dewpoint = 0.0f;
+    control->debug_profile = profile.id;
+    control->debug_condensing_started = 0U;
+    control->debug_fan_boost_allowed = 0U;
 
     HAL_TIM_PWM_Start(tim, tim_channel);
 
-    last_state_tick = HAL_GetTick();
+    control_peltier_output(control);
+    control_set_cold_fan(control, false);
 
-    /* Hot-side fan is always ON. */
+    HAL_GPIO_WritePin(
+            control->error_led_port,
+            control->error_led_pin,
+            GPIO_PIN_RESET);
+
+    /* The hot-side fan remains ON continuously. */
     HAL_GPIO_WritePin(
             control->hot_fan_port,
             control->hot_fan_pin,
             GPIO_PIN_SET);
-}
-
-static void control_peltier_output(control_t *control)
-{
-    HAL_GPIO_WritePin(
-            control->peltier_port,
-            control->peltier_pin,
-            control->peltier_hot_fan_on
-                    ? GPIO_PIN_SET
-                    : GPIO_PIN_RESET);
-}
-
-static void control_cold_fan(control_t *control, uint8_t pwm)
-{
-    __HAL_TIM_SET_COMPARE(
-            control->tim,
-            control->tim_channel,
-            (pwm * COLD_FAN_ARR) / 100U);
-}
-
-static float dew_point_calculate(sht30_t *sht30)
-{
-    /* Magnus-Tetens formula. */
-    float alpha =
-            17.26f * sht30->temp / (237.3f + sht30->temp)
-            + logf(sht30->hum / 100.0f);
-
-    return 237.3f * alpha / (17.27f - alpha);
 }
 
 void control_update(
@@ -106,254 +195,160 @@ void control_update(
 {
     uint32_t current_tick = HAL_GetTick();
 
-    /*
-     * Learning is performed one update after a state transition so the
-     * completed phase extreme remains available until it has been consumed.
-     */
-    static bool pending_learn = false;
-    static bool learn_for_off_phase = false;
+    control_profile_t profile =
+            control_get_profile(control->target_hum);
 
-    if (pending_learn)
-    {
-        if (control->learning_started)
-        {
-            float *target_margin;
-            float actual;
-
-            if (learn_for_off_phase)
-            {
-                target_margin =
-                        &control->overshoot_off_learned;
-
-                actual =
-                        control->target_hum
-                        - control->cycle_extreme_hum;
-            }
-            else
-            {
-                target_margin =
-                        &control->overshoot_on_learned;
-
-                actual =
-                        control->cycle_extreme_hum
-                        - control->target_hum;
-            }
-
-            float step =
-                    OVERSHOOT_LEARN_ALPHA
-                    * (actual - *target_margin);
-
-            if (step > OVERSHOOT_MAX_STEP)
-            {
-                step = OVERSHOOT_MAX_STEP;
-            }
-
-            if (step < -OVERSHOOT_MAX_STEP)
-            {
-                step = -OVERSHOOT_MAX_STEP;
-            }
-
-            *target_margin += step;
-
-            if (*target_margin < OVERSHOOT_MIN_MARGIN)
-            {
-                *target_margin = OVERSHOOT_MIN_MARGIN;
-            }
-        }
-
-        control->learning_started = true;
-        pending_learn = false;
-
-        /* Start extreme tracking for the new phase. */
-        control->cycle_extreme_hum =
-                control->filtered_hum;
-        control->reversal_delta = 0.0f;
-    }
-
-    /*
-     * control_init() runs before the first valid SHT30 sample, therefore the
-     * first update must initialize cycle_extreme_hum from filtered_hum.
-     */
-    if (control->cycle_extreme_hum <= 0.0f)
-    {
-        control->cycle_extreme_hum =
-                control->filtered_hum;
-    }
-
-    /* Track peak/trough and calculate distance from the current extreme. */
-    if (control->peltier_hot_fan_on)
-    {
-        /* During ON, humidity may initially keep rising: track the peak. */
-        if (control->filtered_hum >
-                control->cycle_extreme_hum)
-        {
-            control->cycle_extreme_hum =
-                    control->filtered_hum;
-        }
-
-        control->reversal_delta =
-                control->cycle_extreme_hum
-                - control->filtered_hum;
-    }
-    else
-    {
-        /* During OFF, humidity may initially keep falling: track the trough. */
-        if (control->filtered_hum <
-                control->cycle_extreme_hum)
-        {
-            control->cycle_extreme_hum =
-                    control->filtered_hum;
-        }
-
-        control->reversal_delta =
-                control->filtered_hum
-                - control->cycle_extreme_hum;
-    }
-
-    if (control->reversal_delta < 0.0f)
-    {
-        control->reversal_delta = 0.0f;
-    }
-
-    if (control->reversal_delta >= REVERSAL_CONFIRM_RH)
-    {
-        control->phase_reversed = true;
-    }
+    float raw_hum = sht30->hum;
 
     float turn_on_thres =
             control->target_hum
-            - control->overshoot_on_learned;
+            - profile.on_advance;
 
     float turn_off_thres =
             control->target_hum
-            + control->overshoot_off_learned;
+            + profile.off_advance;
 
-    if (!control->peltier_hot_fan_on)
+    float dew_point_temp =
+            dew_point_calculate(sht30);
+
+    float thermal_margin =
+            dew_point_temp - ntc->temp;
+
+    bool condensing_started =
+            thermal_margin >= CONDENSING_MARGIN;
+
+    uint32_t state_elapsed =
+            current_tick - control->last_state_tick;
+
+    bool first_update =
+            !control->control_started;
+
+    control->control_started = true;
+
+    /*
+     * Peltier control:
+     *   - Switch ON before the target to compensate thermal delay.
+     *   - Switch OFF only after minimum ON time and after the cold plate
+     *     has actually entered the condensation region.
+     */
+    if (!control->peltier_on)
     {
-        /*
-         * OFF -> ON only after the trough has been confirmed, humidity has
-         * risen to the anticipatory ON threshold, and minimum OFF time passed.
-         */
-        if (control->phase_reversed
-                && control->filtered_hum >= turn_on_thres
-                && (current_tick - last_state_tick)
-                        >= MIN_OFF_TIME_MS)
+        bool minimum_off_passed =
+                state_elapsed >= profile.min_off_ms;
+
+        /* Allow immediate startup from a humid initial condition. */
+        bool may_turn_on =
+                first_update || minimum_off_passed;
+
+        if (may_turn_on
+                && raw_hum >= turn_on_thres)
         {
-            control->last_cycle_duration_ms =
-                    current_tick - last_state_tick;
+            control_set_peltier(
+                    control,
+                    true,
+                    current_tick);
 
-            control->peltier_hot_fan_on = true;
-
-            HAL_GPIO_WritePin(
-                    control->error_led_port,
-                    control->error_led_pin,
-                    GPIO_PIN_SET);
-
-            last_state_tick = current_tick;
-
-            /* The completed phase was an OFF phase. */
-            pending_learn = true;
-            learn_for_off_phase = true;
-
-            control->phase_reversed = false;
-
-            /* Start classification for the new ON phase. */
-            control->cold_fan_used_this_phase = false;
+            state_elapsed = 0U;
         }
     }
     else
     {
-        /*
-         * ON -> OFF only after the peak has been confirmed, humidity has
-         * fallen to the anticipatory OFF threshold, and minimum ON time passed.
-         */
-        if (control->phase_reversed
-                && control->filtered_hum <= turn_off_thres
-                && (current_tick - last_state_tick)
-                        >= MIN_ON_TIME_MS)
+        bool minimum_on_passed =
+                state_elapsed >= profile.min_on_ms;
+
+        if (minimum_on_passed
+                && condensing_started
+                && raw_hum <= turn_off_thres)
         {
-            control->last_cycle_duration_ms =
-                    current_tick - last_state_tick;
+            control_set_peltier(
+                    control,
+                    false,
+                    current_tick);
 
-            control->peltier_hot_fan_on = false;
-
-            HAL_GPIO_WritePin(
-                    control->error_led_port,
-                    control->error_led_pin,
-                    GPIO_PIN_RESET);
-
-            last_state_tick = current_tick;
-
-            /* The completed phase was an ON phase. */
-            pending_learn = true;
-            learn_for_off_phase = false;
-
-            control->phase_reversed = false;
-
-            /*
-             * cold_fan_used_this_phase is intentionally retained during OFF.
-             * This associates the following trough with the preceding ON phase.
-             */
+            state_elapsed = 0U;
         }
     }
 
+    /* Keep the GPIO synchronized even if another part of the program changed it. */
     control_peltier_output(control);
 
-    float dew_point_temp = dew_point_calculate(sht30);
+    /* Recalculate elapsed time after a possible Peltier transition. */
+    state_elapsed =
+            current_tick - control->last_state_tick;
 
     /*
-     * Cold-fan hysteresis:
-     *   ON  at plate <= dew point - 5 C while Peltier is ON.
-     *   OFF at plate >  dew point - 2 C or whenever Peltier is OFF.
-     * Between the two thresholds, preserve the previous fan state.
+     * Cold fan is a second-stage boost actuator:
+     *   - Far above target: allow boost as soon as the plate is cold enough.
+     *   - Near target: allow boost only after a long Peltier ON phase.
+     *   - Fan always stops when Peltier stops to avoid residual over-drying.
      */
+    bool thermal_ready =
+            thermal_margin >= COLD_FAN_ON_TEMP_MARGIN;
 
-    bool thermal_ready = ntc->temp <= (dew_point_temp - 4.0);
-    bool humidity_demand = control->filtered_hum >= (control->target_hum + 1.0);
-    bool cold_fan_on = thermal_ready && humidity_demand;
-    bool thermal_not_ready = ntc->temp > (dew_point_temp - 2.0);
-    bool humidity_not_demand = control->filtered_hum <= (control->target_hum + 0.3);
-    bool cold_fan_off = thermal_not_ready || humidity_not_demand;
-    if (cold_fan_on)
+    bool thermal_not_ready =
+            thermal_margin < COLD_FAN_OFF_TEMP_MARGIN;
+
+    bool humidity_demand =
+            raw_hum
+            >= control->target_hum + COLD_FAN_ON_HUM_MARGIN;
+
+    bool humidity_not_demand =
+            raw_hum
+            <= control->target_hum + COLD_FAN_OFF_HUM_MARGIN;
+
+    bool far_above_target =
+            raw_hum
+            >= control->target_hum + COLD_FAN_FAR_ABOVE_OFFSET;
+
+    bool boost_delay_passed =
+            control->peltier_on
+            && state_elapsed >= COLD_FAN_BOOST_DELAY_MS;
+
+    bool fan_boost_allowed =
+            far_above_target || boost_delay_passed;
+
+    if (!control->cold_fan_on)
     {
-        control_cold_fan(control, 50U);
-
-        HAL_GPIO_WritePin(
-                control->normal_led_port,
-                control->normal_led_pin,
-                GPIO_PIN_SET);
-
-        control->debug_cold_fan = 1U;
-        control->cold_fan_used_this_phase = true;
+        if (control->peltier_on
+                && thermal_ready
+                && humidity_demand
+                && fan_boost_allowed)
+        {
+            control_set_cold_fan(
+                    control,
+                    true);
+        }
     }
-    else if (cold_fan_off)
+    else
     {
-        control_cold_fan(control, 0U);
-
-        HAL_GPIO_WritePin(
-                control->normal_led_port,
-                control->normal_led_pin,
-                GPIO_PIN_RESET);
-
-        control->debug_cold_fan = 0U;
+        if (!control->peltier_on
+                || thermal_not_ready
+                || humidity_not_demand)
+        {
+            control_set_cold_fan(
+                    control,
+                    false);
+        }
     }
 
-    control->state_elapsed_ms =
-            current_tick - last_state_tick;
+    control->state_elapsed_ms = state_elapsed;
 
-    control->debug_dewpoint = dew_point_temp;
-    control->debug_peltier =
-            control->peltier_hot_fan_on ? 1U : 0U;
     control->debug_turn_on = turn_on_thres;
     control->debug_turn_off = turn_off_thres;
+    control->debug_dewpoint = dew_point_temp;
+
+    control->debug_peltier =
+            control->peltier_on ? 1U : 0U;
+
+    control->debug_cold_fan =
+            control->cold_fan_on ? 1U : 0U;
+
+    control->debug_profile = profile.id;
+
+    control->debug_condensing_started =
+            condensing_started ? 1U : 0U;
+
+    control->debug_fan_boost_allowed =
+            fan_boost_allowed ? 1U : 0U;
 }
 
-void control_filter_hum(
-        control_t *control,
-        sht30_t *sht30)
-{
-    control->filtered_hum =
-            EMA_ALPHA * sht30->hum
-            + (1.0f - EMA_ALPHA)
-            * control->filtered_hum;
-}
