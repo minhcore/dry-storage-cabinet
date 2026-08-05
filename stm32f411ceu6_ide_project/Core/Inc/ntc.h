@@ -12,6 +12,7 @@
 #define NTC_BETA			3950.0
 #define NTC_SHORTED_THRES	50
 #define NTC_OPEN_THRES		4025
+#define NTC_MAX_POLLING		200		// 200 ms MAX for polling adc
 
 typedef enum
 {

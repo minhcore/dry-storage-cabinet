@@ -4,4 +4,3 @@
 ../Core/Src/oled.c:54:6:oled_draw_char	9
 ../Core/Src/oled.c:86:6:oled_draw_string	2
 ../Core/Src/oled.c:98:6:oled_draw_int	4
-../Core/Src/oled.c:124:6:oled_turn_all	1

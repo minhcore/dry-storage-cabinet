@@ -42,22 +42,19 @@ typedef struct
 
 typedef struct
 {
-    /* Cold fan PWM */
+    // Cold fan PWM
     TIM_HandleTypeDef *tim;
     uint32_t tim_channel;
 
-    /* Peltier and hot-side fan */
+    // Peltier and Hot Fan
     GPIO_TypeDef *peltier_port;
     GPIO_TypeDef *hot_fan_port;
     uint16_t peltier_pin;
     uint16_t hot_fan_pin;
-    bool peltier_hot_fan_on;
 
-    /* Status LEDs */
-    GPIO_TypeDef *error_led_port;
-    GPIO_TypeDef *normal_led_port;
-    uint16_t error_led_pin;
-    uint16_t normal_led_pin;
+    // Peltier LED
+    GPIO_TypeDef *peltier_led_port;
+    uint16_t peltier_led_pin;
 
     /* Control values */
     float target_hum;
@@ -89,10 +86,8 @@ void control_init(
         uint16_t peltier_pin,
         GPIO_TypeDef *hot_fan_port,
         uint16_t hot_fan_pin,
-        GPIO_TypeDef *error_led_port,
-        uint16_t error_led_pin,
-        GPIO_TypeDef *normal_led_port,
-        uint16_t normal_led_pin,
+        GPIO_TypeDef *peltier_led_port,
+        uint16_t peltier_led_pin,
         float target_hum);
 
 void control_update(

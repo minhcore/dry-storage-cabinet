@@ -1,4 +1,4 @@
-../Core/Src/ntc.c:4:14:ntc_init	2
-../Core/Src/ntc.c:14:14:ntc_read_adc	6
-../Core/Src/ntc.c:33:13:ntc_calculate_resistance	1
-../Core/Src/ntc.c:39:6:ntc_calculate_temp	1
+../Core/Src/ntc.c:4:6:ntc_init	1
+../Core/Src/ntc.c:9:14:ntc_read_adc	5
+../Core/Src/ntc.c:26:13:ntc_calculate_resistance	1
+../Core/Src/ntc.c:32:6:ntc_calculate_temp	1

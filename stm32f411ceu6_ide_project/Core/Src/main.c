@@ -39,8 +39,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define STATUS_PORT GPIOB
-#define ERROR_LED GPIO_PIN_13
-#define NORMAL_LED GPIO_PIN_14
+#define ERROR_LED_PIN GPIO_PIN_13
+#define PELTIER_LED_PIN GPIO_PIN_14
 #define BUZZER GIO_PIN_15
 
 #define DRIVER_PORT	GPIOA
@@ -48,6 +48,7 @@
 #define HOT_FAN_PIN GPIO_PIN_3
 
 #define MAX_SENSOR_ERROR 5
+#define MAX_DISPLAY_ERROR 10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -75,6 +76,14 @@ control_t control = {0};
 volatile event_e event;
 state_e current_state;
 event_e local_event;
+uint8_t sensor_error = 0;
+uint8_t display_error = 0;
+uint32_t oled_tick = 0;
+uint32_t sensor_tick = 0;
+uint32_t uart_tick = 0;
+sht30_status_e sht30_status;
+ntc_status_e ntc_status;
+oled_status_e oled_status;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -143,7 +152,38 @@ void menu_setting(void)
 
 void error_raise(void)
 {
+	// stop all the power driver except Hot Fan, leave it to cool down Peltier
+	HAL_GPIO_WritePin(DRIVER_PORT, PELTIER_PIN, 0);
+	HAL_TIM_PWM_Stop(control.tim, control.tim_channel);
 
+	uint32_t error_tick = HAL_GetTick();
+	uint32_t hot_fan_timeout = HAL_GetTick();
+	bool hot_fan_on = 1;
+	// blinking red LED
+	while (1)
+	{
+		if ((HAL_GetTick() - error_tick) >= 500)
+		{
+			HAL_GPIO_TogglePin(STATUS_PORT, ERROR_LED_PIN);
+			error_tick = HAL_GetTick();
+		}
+
+		if (((HAL_GetTick() - hot_fan_timeout) >= 60000) && hot_fan_on) // Hot Fan runs 1 minutes before turning off
+		{
+			HAL_GPIO_WritePin(DRIVER_PORT, HOT_FAN_PIN, 0);
+			hot_fan_on = 0;
+		}
+	}
+}
+
+// Because OLED using interrupt so need this function to call error_raise() task
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
+{
+	if (oled.i2c == hi2c)
+	{
+		display_error++;
+		if (display_error >= MAX_DISPLAY_ERROR) error_raise();
+	}
 }
 
 /* USER CODE END 0 */
@@ -156,13 +196,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	uint32_t oled_tick;
-	uint32_t sensor_tick;
-	uint32_t uart_tick;
-	sht30_status_e sht30_status;
-	ntc_status_e ntc_status;
-	oled_status_e oled_status;
-	uint8_t sensor_error;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -192,13 +226,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   // OLED
-  oled_init(&oled, &hi2c1, OLED_ADDR);
-  oled_clear_display(&oled);
-  oled_send_buffer(&oled);
+  oled_status = oled_init(&oled, &hi2c1, OLED_ADDR);
+  if (oled_status != OLED_OK) error_raise();
   //
 
   // SHT30
-  sht30_init(&sht30, &hi2c1, SHT30_ADDR, sht30_high_repeatability_mode);
+  sht30_status = sht30_init(&sht30, &hi2c1, SHT30_ADDR, sht30_high_repeatability_mode);
+  if (sht30_status != SHT30_OK) error_raise();
   //
 
   // NTC
@@ -213,13 +247,16 @@ int main(void)
   // POWER DRIVER
   control_init(&control, &htim3, TIM_CHANNEL_2,
 		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
-		  STATUS_PORT, ERROR_LED, STATUS_PORT, NORMAL_LED,
-		  50.0);
+		  STATUS_PORT, PELTIER_LED_PIN, 50.0);
   //
 
   // FSM INIT
   fsm_init();
   //
+
+  oled_clear_display(&oled);
+  oled_status = oled_send_buffer(&oled);
+  if (oled_status != OLED_OK) display_error++;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -250,8 +287,8 @@ int main(void)
 		  }
 		  else
 		  {
+			  sensor_error++;
 			  if (sensor_error >= MAX_SENSOR_ERROR) error_raise();
-			  else sensor_error++;
 		  }
 
 		  sensor_tick = HAL_GetTick();
@@ -260,6 +297,18 @@ int main(void)
 	  if ((HAL_GetTick() - oled_tick) >= 500 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  display_update(current_state, &oled, &sht30, &control);
+		  oled_status = oled_send_buffer(&oled);
+
+		  if (oled_status == OLED_OK)
+		  {
+			  display_error = 0; // reset display error when oled displays OK
+		  }
+		  else
+		  {
+			  display_error++;
+			  if (display_error >= MAX_DISPLAY_ERROR) error_raise();
+		  }
+
 		  oled_tick = HAL_GetTick();
 	  }
 

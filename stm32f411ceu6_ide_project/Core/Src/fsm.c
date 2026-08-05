@@ -49,8 +49,7 @@ void fsm_run(event_e current_event)
 	{
 		for (int i = 0; i < table_size; i++)
 		{
-			if (fsm_table[i].current_state == current_state
-				&& fsm_table[i].event == current_event)
+			if (fsm_table[i].current_state == current_state && fsm_table[i].event == current_event)
 			{
 				current_state = fsm_table[i].next_state;
 				break;

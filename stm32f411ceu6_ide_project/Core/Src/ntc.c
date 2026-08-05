@@ -1,7 +1,7 @@
 #include "ntc.h"
 #include "math.h"
 
-ntc_status_e ntc_init(ntc_t* ntc, ADC_HandleTypeDef* adc)
+void ntc_init(ntc_t* ntc, ADC_HandleTypeDef* adc)
 {
 	ntc->adc = adc;
 }
@@ -13,7 +13,7 @@ ntc_status_e ntc_read_adc(ntc_t* ntc)
 	status = HAL_ADC_Start(ntc->adc);
 	if (status != HAL_OK) return NTC_ERROR;
 
-	status = HAL_ADC_PollForConversion(ntc->adc, 1000);
+	status = HAL_ADC_PollForConversion(ntc->adc, NTC_MAX_POLLING);
 	if (status != HAL_OK) return NTC_ERROR;
 
 	ntc->adc_raw = HAL_ADC_GetValue(ntc->adc);

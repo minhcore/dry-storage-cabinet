@@ -3,7 +3,8 @@
 
 #include "stm32f4xx.h"
 
-#define SHT30_ADDR (0x44 << 1)
+#define SHT30_ADDR 			(0x44 << 1)
+#define SHT30_MAX_POLLING	200 		// 200 ms MAX for polling i2c
 
 typedef enum
 {
@@ -27,8 +28,6 @@ typedef struct
 	uint16_t raw_hum;
 	float temp;
 	float hum;
-	uint8_t expected_temp;
-	uint8_t expected_hum;
 }sht30_t;
 
 sht30_status_e sht30_init(sht30_t *sht30, I2C_HandleTypeDef *i2c, uint8_t address, sht30_repeatability_e mode);

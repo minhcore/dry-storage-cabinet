@@ -159,7 +159,6 @@ void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control
 //		set_alarm_display_2(oled, control, 2);
 //		break;
 	}
-	oled_send_buffer(oled);
 }
 
 

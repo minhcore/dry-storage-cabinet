@@ -35,28 +35,15 @@ static control_profile_t control_get_profile(float target_hum)
 
 static void control_peltier_output(control_t *control)
 {
-    HAL_GPIO_WritePin(
-            control->peltier_port,
-            control->peltier_pin,
-            control->peltier_on
-                    ? GPIO_PIN_SET
-                    : GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(control->peltier_port,control->peltier_pin,control->peltier_on? 1 : 0);
 }
 
-static void control_cold_fan_output(
-        control_t *control,
-        uint8_t pwm)
+static void control_cold_fan_output(control_t *control, uint8_t pwm)
 {
-    __HAL_TIM_SET_COMPARE(
-            control->tim,
-            control->tim_channel,
-            (pwm * COLD_FAN_ARR) / 100U);
+    __HAL_TIM_SET_COMPARE(control->tim, control->tim_channel, (pwm * COLD_FAN_ARR) / 100);
 }
 
-static void control_set_peltier(
-        control_t *control,
-        bool on,
-        uint32_t current_tick)
+static void control_set_peltier(control_t *control, bool on, uint32_t current_tick)
 {
     if (control->peltier_on == on)
     {
@@ -64,55 +51,30 @@ static void control_set_peltier(
     }
 
     control->peltier_on = on;
-    /* Kept synchronized because this legacy field is still in control.h. */
-    control->peltier_hot_fan_on = on;
     control->last_state_tick = current_tick;
 
-    HAL_GPIO_WritePin(
-            control->error_led_port,
-            control->error_led_pin,
-            on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(control->peltier_led_port, control->peltier_led_pin, on ? 1 : 0);
 
     control_peltier_output(control);
 }
 
-static void control_set_cold_fan(
-        control_t *control,
-        bool on)
+static void control_set_cold_fan(control_t *control, bool on)
 {
     control->cold_fan_on = on;
 
-    control_cold_fan_output(
-            control,
-            on ? 50U : 0U);
+    control_cold_fan_output(control, on ? 50 : 0);
 
-    HAL_GPIO_WritePin(
-            control->normal_led_port,
-            control->normal_led_pin,
-            on ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 static float dew_point_calculate(const sht30_t *sht30)
 {
-    /* Magnus-Tetens approximation. */
-    const float a = 17.27f;
-    const float b = 237.3f;
+    // Magnus-Tetens approximation
+    float a = 17.27f;
+    float b = 237.3f;
 
     float rh = sht30->hum;
 
-    /* Protect logf() if the sensor temporarily reports an invalid value. */
-    if (rh < 0.1f)
-    {
-        rh = 0.1f;
-    }
-    else if (rh > 100.0f)
-    {
-        rh = 100.0f;
-    }
-
-    float gamma =
-            (a * sht30->temp) / (b + sht30->temp)
-            + logf(rh / 100.0f);
+    float gamma =(a * sht30->temp) / (b + sht30->temp) + logf(rh / 100.0);
 
     return (b * gamma) / (a - gamma);
 }
@@ -125,10 +87,8 @@ void control_init(
         uint16_t peltier_pin,
         GPIO_TypeDef *hot_fan_port,
         uint16_t hot_fan_pin,
-        GPIO_TypeDef *error_led_port,
-        uint16_t error_led_pin,
-        GPIO_TypeDef *normal_led_port,
-        uint16_t normal_led_pin,
+        GPIO_TypeDef *peltier_led_port,
+        uint16_t peltier_led_pin,
         float target_hum)
 {
     control->tim = tim;
@@ -140,24 +100,19 @@ void control_init(
     control->hot_fan_port = hot_fan_port;
     control->hot_fan_pin = hot_fan_pin;
 
-    control->error_led_port = error_led_port;
-    control->error_led_pin = error_led_pin;
-
-    control->normal_led_port = normal_led_port;
-    control->normal_led_pin = normal_led_pin;
+    control->peltier_led_port = peltier_led_port;
+    control->peltier_led_pin = peltier_led_pin;
 
     control->target_hum = target_hum;
 
     control->peltier_on = false;
-    control->peltier_hot_fan_on = false;
     control->cold_fan_on = false;
     control->control_started = false;
 
     control->last_state_tick = HAL_GetTick();
-    control->state_elapsed_ms = 0U;
+    control->state_elapsed_ms = 0;
 
-    control_profile_t profile =
-            control_get_profile(target_hum);
+    control_profile_t profile = control_get_profile(target_hum);
 
     control->debug_turn_on =
             target_hum - profile.on_advance;
@@ -176,16 +131,8 @@ void control_init(
     control_peltier_output(control);
     control_set_cold_fan(control, false);
 
-    HAL_GPIO_WritePin(
-            control->error_led_port,
-            control->error_led_pin,
-            GPIO_PIN_RESET);
-
-    /* The hot-side fan remains ON continuously. */
-    HAL_GPIO_WritePin(
-            control->hot_fan_port,
-            control->hot_fan_pin,
-            GPIO_PIN_SET);
+    // Turn on Hot Fan forever
+    HAL_GPIO_WritePin(control->hot_fan_port, control->hot_fan_pin, 1);
 }
 
 void control_update(
@@ -193,141 +140,86 @@ void control_update(
         ntc_t *ntc,
         sht30_t *sht30)
 {
+	// Peltier Logic
     uint32_t current_tick = HAL_GetTick();
 
-    control_profile_t profile =
-            control_get_profile(control->target_hum);
+    control_profile_t profile = control_get_profile(control->target_hum);
 
     float raw_hum = sht30->hum;
 
-    float turn_on_thres =
-            control->target_hum
-            - profile.on_advance;
+    float turn_on_thres = control->target_hum - profile.on_advance;
 
-    float turn_off_thres =
-            control->target_hum
-            + profile.off_advance;
+    float turn_off_thres = control->target_hum + profile.off_advance;
 
-    float dew_point_temp =
-            dew_point_calculate(sht30);
+    float dew_point_temp = dew_point_calculate(sht30);
 
-    float thermal_margin =
-            dew_point_temp - ntc->temp;
+    float thermal_margin = dew_point_temp - ntc->temp;
 
-    bool condensing_started =
-            thermal_margin >= CONDENSING_MARGIN;
+    bool condensing_started = thermal_margin >= CONDENSING_MARGIN;
 
-    uint32_t state_elapsed =
-            current_tick - control->last_state_tick;
+    uint32_t state_elapsed = current_tick - control->last_state_tick;
 
-    bool first_update =
-            !control->control_started;
+    bool first_update = !control->control_started;
 
     control->control_started = true;
 
-    /*
-     * Peltier control:
-     *   - Switch ON before the target to compensate thermal delay.
-     *   - Switch OFF only after minimum ON time and after the cold plate
-     *     has actually entered the condensation region.
-     */
     if (!control->peltier_on)
     {
-        bool minimum_off_passed =
-                state_elapsed >= profile.min_off_ms;
+        bool minimum_off_passed = state_elapsed >= profile.min_off_ms;
 
         /* Allow immediate startup from a humid initial condition. */
-        bool may_turn_on =
-                first_update || minimum_off_passed;
+        bool may_turn_on = first_update || minimum_off_passed;
 
-        if (may_turn_on
-                && raw_hum >= turn_on_thres)
+        if (may_turn_on && (raw_hum >= turn_on_thres))
         {
-            control_set_peltier(
-                    control,
-                    true,
-                    current_tick);
+            control_set_peltier(control, true, current_tick);
 
-            state_elapsed = 0U;
+            state_elapsed = 0;
         }
     }
     else
     {
-        bool minimum_on_passed =
-                state_elapsed >= profile.min_on_ms;
+        bool minimum_on_passed = state_elapsed >= profile.min_on_ms;
 
-        if (minimum_on_passed
-                && condensing_started
-                && raw_hum <= turn_off_thres)
+        if (minimum_on_passed && condensing_started && (raw_hum <= turn_off_thres))
         {
-            control_set_peltier(
-                    control,
-                    false,
-                    current_tick);
+            control_set_peltier(control, false, current_tick);
 
-            state_elapsed = 0U;
+            state_elapsed = 0;
         }
     }
 
-    /* Keep the GPIO synchronized even if another part of the program changed it. */
     control_peltier_output(control);
 
-    /* Recalculate elapsed time after a possible Peltier transition. */
-    state_elapsed =
-            current_tick - control->last_state_tick;
+    state_elapsed = current_tick - control->last_state_tick;
 
-    /*
-     * Cold fan is a second-stage boost actuator:
-     *   - Far above target: allow boost as soon as the plate is cold enough.
-     *   - Near target: allow boost only after a long Peltier ON phase.
-     *   - Fan always stops when Peltier stops to avoid residual over-drying.
-     */
-    bool thermal_ready =
-            thermal_margin >= COLD_FAN_ON_TEMP_MARGIN;
+    // Cold Fan Logic
+    bool thermal_ready = thermal_margin >= COLD_FAN_ON_TEMP_MARGIN;
 
-    bool thermal_not_ready =
-            thermal_margin < COLD_FAN_OFF_TEMP_MARGIN;
+    bool thermal_not_ready = thermal_margin < COLD_FAN_OFF_TEMP_MARGIN;
 
-    bool humidity_demand =
-            raw_hum
-            >= control->target_hum + COLD_FAN_ON_HUM_MARGIN;
+    bool humidity_demand = raw_hum >= (control->target_hum + COLD_FAN_ON_HUM_MARGIN);
 
-    bool humidity_not_demand =
-            raw_hum
-            <= control->target_hum + COLD_FAN_OFF_HUM_MARGIN;
+    bool humidity_not_demand = raw_hum <= (control->target_hum + COLD_FAN_OFF_HUM_MARGIN);
 
-    bool far_above_target =
-            raw_hum
-            >= control->target_hum + COLD_FAN_FAR_ABOVE_OFFSET;
+    bool far_above_target = raw_hum >= (control->target_hum + COLD_FAN_FAR_ABOVE_OFFSET);
 
-    bool boost_delay_passed =
-            control->peltier_on
-            && state_elapsed >= COLD_FAN_BOOST_DELAY_MS;
+    bool boost_delay_passed = control->peltier_on && (state_elapsed >= COLD_FAN_BOOST_DELAY_MS);
 
-    bool fan_boost_allowed =
-            far_above_target || boost_delay_passed;
+    bool fan_boost_allowed = far_above_target || boost_delay_passed;
 
     if (!control->cold_fan_on)
     {
-        if (control->peltier_on
-                && thermal_ready
-                && humidity_demand
-                && fan_boost_allowed)
+        if (control->peltier_on && thermal_ready && humidity_demand && fan_boost_allowed)
         {
-            control_set_cold_fan(
-                    control,
-                    true);
+            control_set_cold_fan(control, true);
         }
     }
     else
     {
-        if (!control->peltier_on
-                || thermal_not_ready
-                || humidity_not_demand)
+        if (!control->peltier_on || thermal_not_ready || humidity_not_demand)
         {
-            control_set_cold_fan(
-                    control,
-                    false);
+            control_set_cold_fan(control, false);
         }
     }
 

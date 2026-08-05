@@ -28,6 +28,5 @@ oled_status_e oled_send_buffer(oled_t* oled);
 void oled_draw_char(oled_t* oled, char c,uint8_t page, uint8_t x);
 void oled_draw_string(oled_t* oled, char* buf, uint8_t page, uint8_t x);
 void oled_draw_int(oled_t* oled, uint32_t number, uint8_t page, uint8_t x);
-void oled_turn_all(oled_t* oled);
 
 #endif

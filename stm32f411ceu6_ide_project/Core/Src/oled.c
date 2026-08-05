@@ -43,7 +43,7 @@ oled_status_e oled_send_buffer(oled_t* oled)
 	HAL_StatusTypeDef status;
 
 	// Set pointer at 0,0
-	status = HAL_I2C_Master_Transmit(oled->i2c, oled->address, set_column_page, sizeof(set_column_page), 100);
+	status = HAL_I2C_Mem_Write(oled->i2c, oled->address, (uint16_t)command_byte, I2C_MEMADD_SIZE_8BIT, set_column_page, sizeof(set_column_page), 1000);
 	if (status != HAL_OK) return OLED_ERROR;
 
 	status = HAL_I2C_Mem_Write_IT(oled->i2c, oled->address, (uint8_t)(data_byte), I2C_MEMADD_SIZE_8BIT, oled->buffer, OLED_BUFFER_SIZE);
@@ -121,10 +121,6 @@ void oled_draw_int(oled_t* oled, uint32_t number, uint8_t page, uint8_t x)
 	}
 }
 
-void oled_turn_all(oled_t *oled)
-{
-	memset(oled->buffer, 0xff, 1024);
-}
 
 
 
