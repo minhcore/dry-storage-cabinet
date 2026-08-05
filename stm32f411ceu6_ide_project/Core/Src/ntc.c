@@ -3,18 +3,11 @@
 
 ntc_status_e ntc_init(ntc_t* ntc, ADC_HandleTypeDef* adc)
 {
-	if (ntc->is_init == true) return NTC_ERROR;
-	else ntc->is_init = true;
-
 	ntc->adc = adc;
-
-	return NTC_OK;
 }
 
 ntc_status_e ntc_read_adc(ntc_t* ntc)
 {
-	if (!(ntc->is_init)) return NTC_ERROR;
-
 	HAL_StatusTypeDef status;
 
 	status = HAL_ADC_Start(ntc->adc);

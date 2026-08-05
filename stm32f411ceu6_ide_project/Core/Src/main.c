@@ -46,6 +46,8 @@
 #define DRIVER_PORT	GPIOA
 #define PELTIER_PIN GPIO_PIN_2
 #define HOT_FAN_PIN GPIO_PIN_3
+
+#define MAX_SENSOR_ERROR 5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -70,12 +72,6 @@ sht30_t sht30 = {0};
 ntc_t ntc = {0};
 encoder_t encoder = {0};
 control_t control = {0};
-uint32_t oled_tick;
-uint32_t sensor_tick;
-uint32_t control_tick;
-uint32_t uart_tick;
-uint8_t peltier_on = 0;
-uint8_t cold_fan_on = 0;
 volatile event_e event;
 state_e current_state;
 event_e local_event;
@@ -145,6 +141,11 @@ void menu_setting(void)
 	}
 }
 
+void error_raise(void)
+{
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -155,7 +156,13 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	uint32_t oled_tick;
+	uint32_t sensor_tick;
+	uint32_t uart_tick;
+	sht30_status_e sht30_status;
+	ntc_status_e ntc_status;
+	oled_status_e oled_status;
+	uint8_t sensor_error;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -225,32 +232,35 @@ int main(void)
 	  __enable_irq();
 	  fsm_run(local_event);
 	  current_state = fsm_get();
-
 	  menu_setting();
 
-	  if ((HAL_GetTick() - oled_tick) >= 50 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
+	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(sht30.i2c)) == HAL_I2C_STATE_READY)
 	  {
-		  display_update(current_state, &oled, &sht30, &control);
+		  sht30_status = sht30_get(&sht30);
+		  ntc_status = ntc_read_adc(&ntc);
 
-		  oled_tick = HAL_GetTick();
-	  }
+		  if ((sht30_status == SHT30_OK) && (ntc_status == NTC_OK))
+		  {
+			  sht30_calculate(&sht30);
+			  ntc_calculate_temp(&ntc);
 
-	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
-	  {
-		  sht30_get(&sht30);
-		  sht30_calculate(&sht30);
+			  control_update(&control, &ntc, &sht30);
 
-		  ntc_read_adc(&ntc);
-		  ntc_calculate_temp(&ntc);
+			  sensor_error = 0; // reset sensor error when sht30 and ntc read OK
+		  }
+		  else
+		  {
+			  if (sensor_error >= MAX_SENSOR_ERROR) error_raise();
+			  else sensor_error++;
+		  }
 
 		  sensor_tick = HAL_GetTick();
 	  }
 
-	  if ((HAL_GetTick() - control_tick) >= 500)
+	  if ((HAL_GetTick() - oled_tick) >= 500 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
-		  control_update(&control, &ntc, &sht30);
-
-		  control_tick = HAL_GetTick();
+		  display_update(current_state, &oled, &sht30, &control);
+		  oled_tick = HAL_GetTick();
 	  }
 
 	  if ((HAL_GetTick() - uart_tick) >= 500)
