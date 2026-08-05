@@ -21,7 +21,7 @@
 #define HIGH_ON_ADVANCE             0.9
 #define HIGH_OFF_ADVANCE            1.0
 #define HIGH_MIN_ON_MS              40000		// 40 seconds
-#define HIGH_MIN_OFF_MS             20000		// 20 seconds
+#define HIGH_MIN_OFF_MS             40000		// 20 seconds
 
 #define CONDENSING_MARGIN			1.5			// Allow Peltier OFF only after condensation starts
 #define COLD_FAN_ON_TEMP_MARGIN		4.0
