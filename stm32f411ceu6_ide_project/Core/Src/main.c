@@ -138,16 +138,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 
 void menu_setting(void)
 {
-	if (current_state == SET_HUM_CHOOSE)
+	switch (current_state)
 	{
-		if (local_event == UP)
-		{
-			control.target_hum = (control.target_hum == 60) ? 60 : control.target_hum + 1;
-		}
-		else if (local_event == DOWN)
-		{
-			control.target_hum = (control.target_hum == 35) ? 35 : control.target_hum - 1;
-		}
+	case SET_HUM_CHOOSE:
+		if (local_event == UP) 	control.target_hum = (control.target_hum == 60) ? 60 : control.target_hum + 1;
+		else if (local_event == DOWN) control.target_hum = (control.target_hum == 35) ? 35 : control.target_hum - 1;
+		break;
+	case SET_ALARM_LIMIT_TEMP_CHOOSE:
+		if (local_event == UP) control.temp_limit = (control.temp_limit == 100) ? 100 : control.temp_limit + 1;
+		else if (local_event == DOWN) control.temp_limit = (control.temp_limit == 0) ? 0 : control.temp_limit - 1;
+		break;
+	case SET_ALARM_DELAY_TEMP_CHOOSE:
+		if (local_event == UP) control.temp_delay_mins = (control.temp_delay_mins == 120) ? 120 : control.temp_delay_mins + 5;
+		else if (local_event == DOWN) control.temp_delay_mins = (control.temp_delay_mins == 0) ? 0 : control.temp_delay_mins - 5;
+		break;
+	case SET_ALARM_MARGIN_HUM_CHOOSE:
+		if (local_event == UP) control.hum_margin = (control.hum_margin == 10) ? 10 : control.hum_margin + 0.5;
+		else if (local_event == DOWN) control.hum_margin = (control.hum_margin == 0) ? 0 : control.hum_margin - 0.5;
+		break;
+	case SET_ALARM_DELAY_HUM_CHOOSE:
+		if (local_event == UP) control.hum_delay_mins = (control.hum_delay_mins == 120) ? 120 : control.hum_delay_mins + 0.5;
+		else if (local_event == DOWN) control.hum_delay_mins = (control.hum_delay_mins == 0) ? 0 : control.hum_delay_mins - 0.5;
+		break;
 	}
 }
 
