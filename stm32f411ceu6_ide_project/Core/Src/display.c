@@ -130,8 +130,8 @@ static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cur
 	uint8_t current_x = 16;
 	oled_draw_string(oled, "SET ALARM TEMP", 0, 0);
 	draw_cursor(oled, cursor);
-	oled_draw_string(oled, "1.Temp: ", 2, current_x);
-	current_x += strlen("1.Temp: ") * 8;
+	oled_draw_string(oled, "1.Limit: ", 2, current_x);
+	current_x += strlen("1.Limit: ") * 8;
 	oled_draw_int(oled, control->temp_limit, 2, current_x);
 	current_x += 16;
 	oled_draw_char(oled, DEGREE, 2, current_x);
@@ -152,6 +152,45 @@ static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cur
 			{
 				if (toggle) oled_draw_char(oled, ':', 2, 64);
 				else oled_draw_char(oled, ' ', 2, 64);
+			}
+			else if (cursor == 4) // At 2. Delay:
+			{
+				if (toggle) oled_draw_char(oled, ':', 2, 72);
+				else oled_draw_char(oled, ' ', 2, 72);
+			}
+			toggle = ~toggle;
+			display_tick = HAL_GetTick();
+		}
+	}
+}
+
+static void set_alarm_hum_display(oled_t* oled, control_t* control, uint8_t cursor, bool tick)
+{
+	uint8_t current_x = 16;
+	oled_draw_string(oled, "SET ALARM HUM", 0, 0);
+	draw_cursor(oled, cursor);
+	oled_draw_string(oled, "1.Margin: ", 2, current_x);
+	current_x += strlen("1.Margin: ") * 8;
+	oled_draw_int(oled, control->hum_margin, 2, current_x);
+	current_x += 16;
+	oled_draw_char(oled, '%', 2, current_x);
+	current_x = 16; // Reset
+	oled_draw_string(oled, "2.Delay: ", 4, current_x);
+	current_x += strlen("2.Delay: ") * 8;
+	oled_draw_int(oled, control->hum_delay_mins, 4, current_x);
+	current_x += 16;
+	oled_draw_string(oled, "mins", 4, current_x);
+	oled_draw_string(oled, "3.Back", 6, 16);
+
+	if (tick)
+	{
+		uint32_t wait_tick = (toggle) ? 700 : 300;
+		if ((HAL_GetTick() - display_tick) >= wait_tick)
+		{
+			if (cursor == 2) // At 1.Margin
+			{
+				if (toggle) oled_draw_char(oled, ':', 2, 80);
+				else oled_draw_char(oled, ' ', 2, 80);
 			}
 			else if (cursor == 4) // At 2. Delay:
 			{
@@ -225,7 +264,21 @@ void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control
 	case SET_ALARM_TEMP_BACK:
 		set_alarm_temp_display(oled, control, 6, 0);
 		break;
-
+	case SET_ALARM_MARGIN_HUM:
+		set_alarm_hum_display(oled, control, 2, 0);
+		break;
+	case SET_ALARM_MARGIN_HUM_CHOOSE:
+		set_alarm_hum_display(oled, control, 2, 1);
+		break;
+	case SET_ALARM_DELAY_HUM:
+		set_alarm_hum_display(oled, control, 4, 0);
+		break;
+	case SET_ALARM_DELAY_HUM_CHOOSE:
+		set_alarm_hum_display(oled, control, 4, 1);
+		break;
+	case SET_ALARM_HUM_BACK:
+		set_alarm_hum_display(oled, control, 6, 0);
+		break;
 	}
 }
 
