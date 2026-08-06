@@ -88,8 +88,7 @@ void control_init(
         GPIO_TypeDef *hot_fan_port,
         uint16_t hot_fan_pin,
         GPIO_TypeDef *peltier_led_port,
-        uint16_t peltier_led_pin,
-        float target_hum)
+        uint16_t peltier_led_pin)
 {
     control->tim = tim;
     control->tim_channel = tim_channel;
@@ -103,21 +102,25 @@ void control_init(
     control->peltier_led_port = peltier_led_port;
     control->peltier_led_pin = peltier_led_pin;
 
-    control->target_hum = target_hum;
+    control->target_hum = DEFAULT_TARGET_HUM;
 
     control->peltier_on = false;
     control->cold_fan_on = false;
     control->control_started = false;
 
+    control->temp_limit = DEFAULT_TEMP_LIMIT_ALARM;
+    control->temp_delay_mins = DEFAULT_TEMP_DELAY_ALARM;
+    control->hum_margin = DEFAULT_HUM_MARGIN_ALARM;
+    control->hum_delay_mins = DEFAULT_HUM_DELAY_ALARM;
+    control->is_buzzer = true;
+
     control->last_state_tick = HAL_GetTick();
     control->state_elapsed_ms = 0;
 
-    control_profile_t profile = control_get_profile(target_hum);
+    control_profile_t profile = control_get_profile(DEFAULT_TARGET_HUM);
 
-    control->debug_turn_on =
-            target_hum - profile.on_advance;
-    control->debug_turn_off =
-            target_hum + profile.off_advance;
+    control->debug_turn_on = target_hum - profile.on_advance;
+    control->debug_turn_off = target_hum + profile.off_advance;
     control->debug_dewpoint = 0.0f;
 
     control->debug_peltier = 0U;

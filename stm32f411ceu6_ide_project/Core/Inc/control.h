@@ -7,6 +7,11 @@
 #include "sht30.h"
 
 #define COLD_FAN_ARR              	999U
+#define DEFAULT_TARGET_HUM			50.0		// %
+#define DEFAULT_TEMP_LIMIT_ALARM	45			// C (degree)
+#define DEFAULT_TEMP_DELAY_ALARM	0			// minutes
+#define DEFAULT_HUM_MARGIN_ALARM	5			// %
+#define DEFAULT_HUM_DELAY_ALARM		30			// minutes
 
 #define LOW_ON_ADVANCE              0.1
 #define LOW_OFF_ADVANCE           	0.3
@@ -56,13 +61,24 @@ typedef struct
     GPIO_TypeDef *peltier_led_port;
     uint16_t peltier_led_pin;
 
-    /* Control values */
+    // Control Value
     float target_hum;
     bool peltier_on;
     bool cold_fan_on;
     bool control_started;
     uint32_t last_state_tick;
     uint32_t state_elapsed_ms;
+
+    // Temp Alarm (If current temp reaches temp_limit for temp_delay, the alarm will go on)
+    float temp_limit;
+    float temp_delay_mins;	 // minutes
+
+	// Hum Alarm (If after hum_delay, the current hum still exceeds the +-hum_margin, the alarm will go on)
+    float hum_margin;
+    float hum_delay_mins;	// minutes
+
+    // Buzzer
+    bool is_buzzer;
 
     /* UART/live-plot debug values */
     float debug_turn_on;
@@ -87,8 +103,7 @@ void control_init(
         GPIO_TypeDef *hot_fan_port,
         uint16_t hot_fan_pin,
         GPIO_TypeDef *peltier_led_port,
-        uint16_t peltier_led_pin,
-        float target_hum);
+        uint16_t peltier_led_pin);
 
 void control_update(
         control_t *control,

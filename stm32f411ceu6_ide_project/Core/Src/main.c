@@ -84,6 +84,7 @@ uint32_t uart_tick = 0;
 sht30_status_e sht30_status;
 ntc_status_e ntc_status;
 oled_status_e oled_status;
+bool error_pending = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -182,7 +183,7 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
 	if (oled.i2c == hi2c)
 	{
 		display_error++;
-		if (display_error >= MAX_DISPLAY_ERROR) error_raise();
+		if (display_error >= MAX_DISPLAY_ERROR) pending_error = true;
 	}
 }
 
@@ -227,12 +228,12 @@ int main(void)
 
   // OLED
   oled_status = oled_init(&oled, &hi2c1, OLED_ADDR);
-  if (oled_status != OLED_OK) error_raise();
+  if (oled_status != OLED_OK) error_pending = true;
   //
 
   // SHT30
   sht30_status = sht30_init(&sht30, &hi2c1, SHT30_ADDR, sht30_high_repeatability_mode);
-  if (sht30_status != SHT30_OK) error_raise();
+  if (sht30_status != SHT30_OK) error_pending = true;
   //
 
   // NTC
@@ -267,6 +268,9 @@ int main(void)
 	  local_event = event;
 	  event = NONE;
 	  __enable_irq();
+
+	  if (error_pending) local_event = ERROR_HAPPEN;
+
 	  fsm_run(local_event);
 	  current_state = fsm_get();
 	  menu_setting();

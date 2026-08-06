@@ -8,6 +8,6 @@
 
 #define DEGREE 0x80
 
-void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control_t* control);
+void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control_t* control, bool alarm_active);
 
 #endif
