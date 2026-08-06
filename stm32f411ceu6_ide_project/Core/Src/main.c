@@ -84,7 +84,7 @@ uint32_t uart_tick = 0;
 sht30_status_e sht30_status;
 ntc_status_e ntc_status;
 oled_status_e oled_status;
-bool error_pending = false;
+volatile bool error_pending = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -195,7 +195,7 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
 	if (oled.i2c == hi2c)
 	{
 		display_error++;
-		if (display_error >= MAX_DISPLAY_ERROR) pending_error = true;
+		if (display_error >= MAX_DISPLAY_ERROR) error_pending = true;
 	}
 }
 
@@ -260,7 +260,7 @@ int main(void)
   // POWER DRIVER
   control_init(&control, &htim3, TIM_CHANNEL_2,
 		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
-		  STATUS_PORT, PELTIER_LED_PIN, 50.0);
+		  STATUS_PORT, PELTIER_LED_PIN);
   //
 
   // FSM INIT

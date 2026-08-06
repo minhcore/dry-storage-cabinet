@@ -15,6 +15,21 @@ sht30_status_e sht30_init(sht30_t *sht30, I2C_HandleTypeDef *i2c, uint8_t addres
 	return SHT30_OK;
 }
 
+static uint8_t sht30_crc_calculate(uint8_t byte1, uint8_t byte2)
+{
+	uint8_t crc = 0xFF;
+
+	crc ^= byte1;
+	crc ^= byte2;
+
+	for (int i = 0; i < 8; i++)
+	{
+		if (crc & 0x80) crc = (crc << 1) ^ 0x32;
+		else crc = crc << 1;
+	}
+	return crc;
+}
+
 void sht30_config(sht30_t *sht30, sht30_repeatability_e new_mode)
 {
 	sht30->repeat_mode = new_mode;
@@ -49,8 +64,12 @@ sht30_status_e sht30_get(sht30_t *sht30)
 	// Receive raw 16 bit temperature and humidity
 	// temp(msb) + temp(lsb) + checksum + hum(msb) + hum(lsb) + checksum
 	uint8_t data[6];
+	uint8_t temp_crc, hum_crc;
 	status = HAL_I2C_Master_Receive(sht30->i2c, sht30->address, data, 6, SHT30_MAX_POLLING);
 	if (status != HAL_OK) return SHT30_ERROR;
+	temp_crc = sht30_crc_calculate(data[0], data[1]);
+	hum_crc = sht30_crc_calculate(data[3], data[4]);
+	if (temp_crc != data[2] || hum_crc != data[5]) return SHT30_ERROR;
 	sht30->raw_temp = (data[0] << 8) | data[1];
 	sht30->raw_hum = (data[3] << 8) | data[4];
 

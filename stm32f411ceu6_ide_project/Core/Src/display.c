@@ -135,12 +135,6 @@ static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cur
 	oled_draw_int(oled, control->temp_limit, 2, current_x);
 	current_x += 16;
 	oled_draw_char(oled, DEGREE, 2, current_x);
-	current_x = 16; // Reset
-	oled_draw_string(oled, "2.Delay: ", 4, current_x);
-	current_x += strlen("2.Delay: ") * 8;
-	oled_draw_int(oled, control->temp_delay_mins, 4, current_x);
-	current_x += 16;
-	oled_draw_string(oled, "mins", 4, current_x);
 	oled_draw_string(oled, "3.Back", 6, 16);
 
 	if (tick)
@@ -148,16 +142,8 @@ static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cur
 		uint32_t wait_tick = (toggle) ? 700 : 300;
 		if ((HAL_GetTick() - display_tick) >= wait_tick)
 		{
-			if (cursor == 2) // At 1.Temp
-			{
-				if (toggle) oled_draw_char(oled, ':', 2, 64);
-				else oled_draw_char(oled, ' ', 2, 64);
-			}
-			else if (cursor == 4) // At 2. Delay:
-			{
-				if (toggle) oled_draw_char(oled, ':', 2, 72);
-				else oled_draw_char(oled, ' ', 2, 72);
-			}
+			if (toggle) oled_draw_char(oled, ':', 2, 64);
+			else oled_draw_char(oled, ' ', 2, 64);
 			toggle = ~toggle;
 			display_tick = HAL_GetTick();
 		}
@@ -254,12 +240,6 @@ void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control
 		break;
 	case SET_ALARM_LIMIT_TEMP_CHOOSE:
 		set_alarm_temp_display(oled, control, 2, 1);
-		break;
-	case SET_ALARM_DELAY_TEMP:
-		set_alarm_temp_display(oled, control, 4, 0);
-		break;
-	case SET_ALARM_DELAY_TEMP_CHOOSE:
-		set_alarm_temp_display(oled, control, 4, 1);
 		break;
 	case SET_ALARM_TEMP_BACK:
 		set_alarm_temp_display(oled, control, 6, 0);

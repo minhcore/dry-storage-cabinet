@@ -69,11 +69,10 @@ typedef struct
     uint32_t last_state_tick;
     uint32_t state_elapsed_ms;
 
-    // Temp Alarm (If current temp reaches temp_limit for temp_delay, the alarm will go on)
+    // Temp Alarm (If current temp reaches temp_limit, the alarm will go on)
     float temp_limit;
-    float temp_delay_mins;	 // minutes
 
-	// Hum Alarm (If after hum_delay, the current hum still exceeds the +-hum_margin, the alarm will go on)
+	// Hum Alarm (If after hum_delay (time after starting machine or changing target), the current hum still exceeds the +-hum_margin, the alarm will go on)
     float hum_margin;
     float hum_delay_mins;	// minutes
 

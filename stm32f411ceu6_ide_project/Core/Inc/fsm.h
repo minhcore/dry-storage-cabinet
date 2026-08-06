@@ -27,8 +27,6 @@ typedef enum
 	// Set Alarm (SUB) temperature
 	SET_ALARM_LIMIT_TEMP,
 	SET_ALARM_LIMIT_TEMP_CHOOSE,
-	SET_ALARM_DELAY_TEMP,
-	SET_ALARM_DELAY_TEMP_CHOOSE,
 	SET_ALARM_TEMP_BACK,
 
 	// Set Alarm (SUB) humidity
