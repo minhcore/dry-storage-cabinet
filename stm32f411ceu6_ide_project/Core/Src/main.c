@@ -313,34 +313,37 @@ int main(void)
   {
 	  menu_task(); // Update current state
 
-	  error_task(); // Checking error
+	  error_task(); // Handle error
 
-	  control_buzzer_update(&control); // Update buzzer state
-
-	  // Reading sensor values -> Checking alarm and Updating control state
-	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(sht30.i2c)) == HAL_I2C_STATE_READY)
+	  if (!error_pending)
 	  {
-		  sht30_status = sht30_get(&sht30);
-		  ntc_status = ntc_read_adc(&ntc);
+		  control_buzzer_update(&control); // Update buzzer state
 
-		  if ((sht30_status == SHT30_OK) && (ntc_status == NTC_OK))
+		  // Reading sensor values -> Checking alarm and Updating control state
+		  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(sht30.i2c)) == HAL_I2C_STATE_READY)
 		  {
-			  sht30_calculate(&sht30);
-			  ntc_calculate_temp(&ntc);
+			  sht30_status = sht30_get(&sht30);
+			  ntc_status = ntc_read_adc(&ntc);
 
-			  control_alarm_hum_check(&control, &sht30);
-			  control_alarm_temp_check(&control, &sht30);
-			  control_update(&control, &ntc, &sht30);
+			  if ((sht30_status == SHT30_OK) && (ntc_status == NTC_OK))
+			  {
+				  sht30_calculate(&sht30);
+				  ntc_calculate_temp(&ntc);
 
-			  sensor_error = 0; // reset sensor error when sht30 and ntc read OK
+				  control_alarm_hum_check(&control, &sht30);
+				  control_alarm_temp_check(&control, &sht30);
+				  control_update(&control, &ntc, &sht30);
+
+				  sensor_error = 0; // reset sensor error when sht30 and ntc read OK
+			  }
+			  else
+			  {
+				  sensor_error++;
+				  if (sensor_error >= MAX_SENSOR_ERROR) error_raise();
+			  }
+
+			  sensor_tick = HAL_GetTick();
 		  }
-		  else
-		  {
-			  sensor_error++;
-			  if (sensor_error >= MAX_SENSOR_ERROR) error_raise();
-		  }
-
-		  sensor_tick = HAL_GetTick();
 	  }
 
 	  // Displaying on OLED
