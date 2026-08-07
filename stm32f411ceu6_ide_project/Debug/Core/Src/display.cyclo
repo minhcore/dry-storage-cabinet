@@ -6,5 +6,5 @@
 ../Core/Src/display.c:97:13:set_alarm_display	6
 ../Core/Src/display.c:123:13:set_alarm_back_display	1
 ../Core/Src/display.c:129:13:set_alarm_temp_display	5
-../Core/Src/display.c:154:13:set_alarm_hum_display	8
-../Core/Src/display.c:193:6:display_update	22
+../Core/Src/display.c:156:13:set_alarm_hum_display	8
+../Core/Src/display.c:195:6:display_update	22

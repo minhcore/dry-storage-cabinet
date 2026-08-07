@@ -144,17 +144,21 @@ void menu_setting(void)
 		if (local_event == UP) 	control.target_hum = (control.target_hum == 60) ? 60 : control.target_hum + 1;
 		else if (local_event == DOWN) control.target_hum = (control.target_hum == 35) ? 35 : control.target_hum - 1;
 		break;
+	case SET_ALARM_BUZZER_CHOOSE:
+		if (local_event == UP) control.is_buzzer = true;
+		else if (local_event == DOWN) control.is_buzzer = false;
+		break;
 	case SET_ALARM_LIMIT_TEMP_CHOOSE:
 		if (local_event == UP) control.temp_limit = (control.temp_limit == 100) ? 100 : control.temp_limit + 1;
 		else if (local_event == DOWN) control.temp_limit = (control.temp_limit == 0) ? 0 : control.temp_limit - 1;
 		break;
 	case SET_ALARM_MARGIN_HUM_CHOOSE:
-		if (local_event == UP) control.hum_margin = (control.hum_margin == 10) ? 10 : control.hum_margin + 0.5;
-		else if (local_event == DOWN) control.hum_margin = (control.hum_margin == 0) ? 0 : control.hum_margin - 0.5;
+		if (local_event == UP) control.hum_margin = (control.hum_margin == 10) ? 10 : control.hum_margin + 1;
+		else if (local_event == DOWN) control.hum_margin = (control.hum_margin == 0) ? 0 : control.hum_margin - 1;
 		break;
 	case SET_ALARM_DELAY_HUM_CHOOSE:
-		if (local_event == UP) control.hum_delay_mins = (control.hum_delay_mins == 120) ? 120 : control.hum_delay_mins + 0.5;
-		else if (local_event == DOWN) control.hum_delay_mins = (control.hum_delay_mins == 0) ? 0 : control.hum_delay_mins - 0.5;
+		if (local_event == UP) control.hum_delay_mins = (control.hum_delay_mins == 120) ? 120 : control.hum_delay_mins + 5;
+		else if (local_event == DOWN) control.hum_delay_mins = (control.hum_delay_mins == 0) ? 0 : control.hum_delay_mins - 5;
 		break;
 	}
 }
@@ -256,7 +260,7 @@ int main(void)
   // POWER DRIVER
   control_init(&control, &htim3, TIM_CHANNEL_2,
 		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
-		  STATUS_PORT, PELTIER_LED_PIN);
+		  STATUS_PORT, PELTIER_LED_PIN, STATUS_PORT, BUZZER_PIN);
   //
 
   // FSM INIT
@@ -308,7 +312,7 @@ int main(void)
 		  sensor_tick = HAL_GetTick();
 	  }
 
-	  if ((HAL_GetTick() - oled_tick) >= 500 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
+	  if ((HAL_GetTick() - oled_tick) >= 250 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  display_update(current_state, &oled, &sht30, &control);
 		  oled_status = oled_send_buffer(&oled);

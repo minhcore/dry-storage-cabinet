@@ -97,23 +97,23 @@ static void error_display(oled_t* oled)
 static void set_alarm_display(oled_t* oled, control_t* control, uint8_t cursor, bool tick)
 {
 	uint8_t current_x = 16;
-	oled_draw_string(oled, "SET ALARM:", 0, 0);
+	oled_draw_string(oled, "SET ALARM:", 0, 16);
 	draw_cursor(oled, cursor);
 	oled_draw_string(oled, "1.Temp", 2, 16);
 	oled_draw_string(oled, "2.Hum", 4, 16);
-	oled_draw_string(oled, "3.Buzz: ", 6, 16);
-	current_x = strlen("3. Buzz: ") * 8;
+	oled_draw_string(oled, "3.Buzzer: ", 6, 16);
+	current_x += strlen("3.Buzzer: ") * 8;
 
 	if (control->is_buzzer) oled_draw_string(oled, "ON", 6, current_x);
-	oled_draw_string(oled, "OFF", 6, current_x);
+	else oled_draw_string(oled, "OFF", 6, current_x);
 
 	if (tick)
 	{
 		uint32_t wait_tick = (toggle) ? 700 : 300;
 		if ((HAL_GetTick() - display_tick) >= wait_tick)
 		{
-			if (toggle) oled_draw_char(oled, ':', 6, 64);
-			else oled_draw_char(oled, ' ', 6, 64);
+			if (toggle) oled_draw_char(oled, ':', 6, 80);
+			else oled_draw_char(oled, ' ', 6, 80);
 			toggle = !toggle;
 			display_tick = HAL_GetTick();
 		}
@@ -122,29 +122,31 @@ static void set_alarm_display(oled_t* oled, control_t* control, uint8_t cursor, 
 
 static void set_alarm_back_display(oled_t* oled)
 {
-	oled_draw_string(oled, "SET ALARM:", 0, 0);
-	oled_draw_string(oled, ">4.Back", 2, 0);
+	oled_draw_string(oled, "SET ALARM:", 0, 16);
+	oled_draw_string(oled, "> 4.Back", 2, 0);
 }
 
 static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cursor, bool tick)
 {
 	uint8_t current_x = 16;
-	oled_draw_string(oled, "SET ALARM TEMP", 0, 0);
+	oled_draw_string(oled, "TEMP ALARM:", 0, 16);
 	draw_cursor(oled, cursor);
 	oled_draw_string(oled, "1.Limit: ", 2, current_x);
 	current_x += strlen("1.Limit: ") * 8;
 	oled_draw_int(oled, control->temp_limit, 2, current_x);
 	current_x += 16;
 	oled_draw_char(oled, DEGREE, 2, current_x);
-	oled_draw_string(oled, "3.Back", 6, 16);
+	current_x += 8;
+	oled_draw_char(oled, 'C', 2, current_x);
+	oled_draw_string(oled, "2.Back", 4, 16);
 
 	if (tick)
 	{
 		uint32_t wait_tick = (toggle) ? 700 : 300;
 		if ((HAL_GetTick() - display_tick) >= wait_tick)
 		{
-			if (toggle) oled_draw_char(oled, ':', 2, 64);
-			else oled_draw_char(oled, ' ', 2, 64);
+			if (toggle) oled_draw_char(oled, ':', 2, 72);
+			else oled_draw_char(oled, ' ', 2, 72);
 			toggle = !toggle;
 			display_tick = HAL_GetTick();
 		}
@@ -154,16 +156,16 @@ static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cur
 static void set_alarm_hum_display(oled_t* oled, control_t* control, uint8_t cursor, bool tick)
 {
 	uint8_t current_x = 16;
-	oled_draw_string(oled, "SET ALARM HUM", 0, 0);
+	oled_draw_string(oled, "HUM ALARM:", 0, 16);
 	draw_cursor(oled, cursor);
 	oled_draw_string(oled, "1.Margin: ", 2, current_x);
 	current_x += strlen("1.Margin: ") * 8;
 	oled_draw_int(oled, control->hum_margin, 2, current_x);
-	current_x += 16;
+	current_x += 24;
 	oled_draw_char(oled, '%', 2, current_x);
 	current_x = 16; // Reset
-	oled_draw_string(oled, "2.Delay: ", 4, current_x);
-	current_x += strlen("2.Delay: ") * 8;
+	oled_draw_string(oled, "2.Delay:", 4, current_x);
+	current_x += strlen("2.Delay:") * 8;
 	oled_draw_int(oled, control->hum_delay_mins, 4, current_x);
 	current_x += 16;
 	oled_draw_string(oled, "mins", 4, current_x);
@@ -181,8 +183,8 @@ static void set_alarm_hum_display(oled_t* oled, control_t* control, uint8_t curs
 			}
 			else if (cursor == 4) // At 2. Delay:
 			{
-				if (toggle) oled_draw_char(oled, ':', 2, 72);
-				else oled_draw_char(oled, ' ', 2, 72);
+				if (toggle) oled_draw_char(oled, ':', 4, 72);
+				else oled_draw_char(oled, ' ', 4, 72);
 			}
 			toggle = !toggle;
 			display_tick = HAL_GetTick();
@@ -243,7 +245,7 @@ void display_update(state_e current_state, oled_t* oled, sht30_t* sht30, control
 		set_alarm_temp_display(oled, control, 2, 1);
 		break;
 	case SET_ALARM_TEMP_BACK:
-		set_alarm_temp_display(oled, control, 6, 0);
+		set_alarm_temp_display(oled, control, 4, 0);
 		break;
 	case SET_ALARM_MARGIN_HUM:
 		set_alarm_hum_display(oled, control, 2, 0);

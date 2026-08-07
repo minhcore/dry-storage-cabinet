@@ -92,7 +92,9 @@ void control_init(
         GPIO_TypeDef *hot_fan_port,
         uint16_t hot_fan_pin,
         GPIO_TypeDef *peltier_led_port,
-        uint16_t peltier_led_pin)
+        uint16_t peltier_led_pin,
+		GPIO_TypeDef* buzzer_port,
+		uint16_t buzzer_pin)
 {
     control->tim = tim;
     control->tim_channel = tim_channel;
@@ -105,6 +107,9 @@ void control_init(
 
     control->peltier_led_port = peltier_led_port;
     control->peltier_led_pin = peltier_led_pin;
+
+    control->buzzer_port = buzzer_port;
+    control->buzzer_pin = buzzer_pin;
 
     control->target_hum = DEFAULT_TARGET_HUM;
 

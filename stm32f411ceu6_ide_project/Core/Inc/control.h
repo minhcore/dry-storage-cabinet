@@ -106,7 +106,9 @@ void control_init(
         GPIO_TypeDef *hot_fan_port,
         uint16_t hot_fan_pin,
         GPIO_TypeDef *peltier_led_port,
-        uint16_t peltier_led_pin);
+        uint16_t peltier_led_pin,
+		GPIO_TypeDef* buzzer_port,
+		uint16_t buzzer_pin);
 
 void control_update(control_t *control ,ntc_t *ntc, sht30_t *sht30);
 

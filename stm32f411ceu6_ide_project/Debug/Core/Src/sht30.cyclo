@@ -1,5 +1,5 @@
 ../Core/Src/sht30.c:5:16:sht30_init	2
-../Core/Src/sht30.c:18:16:sht30_crc_calculate	3
-../Core/Src/sht30.c:33:6:sht30_config	1
-../Core/Src/sht30.c:38:16:sht30_get	9
-../Core/Src/sht30.c:79:6:sht30_calculate	1
+../Core/Src/sht30.c:18:16:sht30_crc_calculate	4
+../Core/Src/sht30.c:35:6:sht30_config	1
+../Core/Src/sht30.c:40:16:sht30_get	9
+../Core/Src/sht30.c:81:6:sht30_calculate	1
