@@ -38,17 +38,24 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define STATUS_PORT GPIOB
-#define ERROR_LED_PIN GPIO_PIN_13
-#define PELTIER_LED_PIN GPIO_PIN_14
-#define BUZZER_PIN GPIO_PIN_15
+#define STATUS_PORT 				GPIOB
+#define ERROR_LED_PIN 				GPIO_PIN_13
+#define PELTIER_LED_PIN 			GPIO_PIN_14
+#define BUZZER_PIN 					GPIO_PIN_15
 
-#define DRIVER_PORT	GPIOA
-#define PELTIER_PIN GPIO_PIN_2
-#define HOT_FAN_PIN GPIO_PIN_3
+#define DRIVER_PORT					GPIOA
+#define PELTIER_PIN 				GPIO_PIN_2
+#define HOT_FAN_PIN 				GPIO_PIN_3
 
-#define MAX_SENSOR_ERROR 5
-#define MAX_DISPLAY_ERROR 10
+#define COLD_FAN_TIM_HANDLE			&htim3
+#define COLD_FAN_CHANNEL 			TIM_CHANNEL_2
+
+#define ENCODER_BUTTON_PIN			GPIO_PIN_4
+#define ENCODER_MAIN_TIM_HANDLE		&htim2
+#define ENCODER_TICK_TIM_HANDLE		&htim4
+
+#define MAX_SENSOR_ERROR 			5
+#define MAX_DISPLAY_ERROR 			10
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -81,6 +88,7 @@ uint8_t display_error = 0;
 uint32_t oled_tick = 0;
 uint32_t sensor_tick = 0;
 uint32_t uart_tick = 0;
+uint32_t error_tick, hot_fan_timeout;
 sht30_status_e sht30_status;
 ntc_status_e ntc_status;
 oled_status_e oled_status;
@@ -160,42 +168,69 @@ void menu_setting(void)
 		if (local_event == UP) control.hum_delay_mins = (control.hum_delay_mins == 120) ? 120 : control.hum_delay_mins + 5;
 		else if (local_event == DOWN) control.hum_delay_mins = (control.hum_delay_mins == 0) ? 0 : control.hum_delay_mins - 5;
 		break;
+	default: break;
 	}
 }
 
 void error_raise(void)
 {
-	// stop all the power driver except Hot Fan, leave it to cool down Peltier
+	if (error_pending) return;
+
+	error_pending = true;
+	error_tick = HAL_GetTick();
+	hot_fan_timeout = HAL_GetTick();
+
+	// stop all the loads except Hot Fan, leave it to cool down Peltier
 	HAL_GPIO_WritePin(DRIVER_PORT, PELTIER_PIN, 0);
-	HAL_TIM_PWM_Stop(control.tim, control.tim_channel);
-
-	uint32_t error_tick = HAL_GetTick();
-	uint32_t hot_fan_timeout = HAL_GetTick();
-	bool hot_fan_on = 1;
-	// blinking red LED
-	while (1)
-	{
-		if ((HAL_GetTick() - error_tick) >= 500)
-		{
-			HAL_GPIO_TogglePin(STATUS_PORT, ERROR_LED_PIN);
-			error_tick = HAL_GetTick();
-		}
-
-		if (((HAL_GetTick() - hot_fan_timeout) >= 60000) && hot_fan_on) // Hot Fan runs 1 minutes before turning off
-		{
-			HAL_GPIO_WritePin(DRIVER_PORT, HOT_FAN_PIN, 0);
-			hot_fan_on = 0;
-		}
-	}
+	HAL_TIM_PWM_Stop(COLD_FAN_TIM_HANDLE, COLD_FAN_CHANNEL);
+	HAL_GPIO_WritePin(STATUS_PORT, BUZZER_PIN, 0);
+	HAL_GPIO_WritePin(STATUS_PORT, PELTIER_LED_PIN, 0);
+	HAL_GPIO_WritePin(DRIVER_PORT, HOT_FAN_PIN, 1);
 }
 
-// Because OLED using interrupt so need this function to call error_raise() task
+void error_task(void)
+{
+	if (!error_pending) return;
+
+	if ((HAL_GetTick() - error_tick) >= 500)
+	{
+		HAL_GPIO_TogglePin(STATUS_PORT, ERROR_LED_PIN);
+		error_tick = HAL_GetTick();
+	}
+
+	// After 1 minutes of error happening, turn off Hot Fan
+	if ((HAL_GetTick() - hot_fan_timeout) >= 60000) HAL_GPIO_WritePin(DRIVER_PORT, HOT_FAN_PIN, 0);
+}
+
+void menu_task(void)
+{
+	__disable_irq();
+	local_event = event;
+	event = NONE;
+	__enable_irq();
+
+	state_e state_before_event = fsm_get();
+
+	if ((state_before_event == RUNNING) && (local_event == PRESSED) && (control.is_alarm_hum || control.is_alarm_temp))
+	{
+		control_alarm_ack(&control);
+		local_event = NONE; // overwrite if has ALARM
+	}
+
+	if (error_pending) local_event = ERROR_HAPPEN; // overwrite if has ERROR
+
+	fsm_run(local_event);
+	current_state = fsm_get();
+	menu_setting();
+}
+
+// Because OLED using i2c interrupt so need this function to call error_raise() task
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
 {
 	if (oled.i2c == hi2c)
 	{
 		display_error++;
-		if (display_error >= MAX_DISPLAY_ERROR) error_pending = true;
+		if (display_error >= MAX_DISPLAY_ERROR) error_raise();
 	}
 }
 
@@ -240,12 +275,12 @@ int main(void)
 
   // OLED
   oled_status = oled_init(&oled, &hi2c1, OLED_ADDR);
-  if (oled_status != OLED_OK) error_pending = true;
+  if (oled_status != OLED_OK) error_raise();
   //
 
   // SHT30
   sht30_status = sht30_init(&sht30, &hi2c1, SHT30_ADDR, sht30_high_repeatability_mode);
-  if (sht30_status != SHT30_OK) error_pending = true;
+  if (sht30_status != SHT30_OK) error_raise();
   //
 
   // NTC
@@ -253,12 +288,12 @@ int main(void)
   //
 
   // ENCODER EC11
-  encoder_init(&encoder, &htim2, GPIO_PIN_4);
-  HAL_TIM_Base_Start_IT(&htim4);
+  encoder_init(&encoder, ENCODER_MAIN_TIM_HANDLE, ENCODER_BUTTON_PIN);
+  HAL_TIM_Base_Start_IT(ENCODER_TICK_TIM_HANDLE);
   //
 
   // POWER DRIVER
-  control_init(&control, &htim3, TIM_CHANNEL_2,
+  control_init(&control, COLD_FAN_TIM_HANDLE, COLD_FAN_CHANNEL,
 		  DRIVER_PORT, PELTIER_PIN, DRIVER_PORT, HOT_FAN_PIN,
 		  STATUS_PORT, PELTIER_LED_PIN, STATUS_PORT, BUZZER_PIN);
   //
@@ -276,27 +311,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  __disable_irq();
-	  local_event = event;
-	  event = NONE;
-	  __enable_irq();
+	  menu_task(); // Update current state
 
-	  state_e state_before_event = fsm_get();
+	  error_task(); // Checking error
 
-	  if ((state_before_event == RUNNING) && (local_event == PRESSED) && (control.is_alarm_hum || control.is_alarm_temp))
-	  {
-		  control_alarm_ack(&control);
-		  local_event = NONE; // overwrite if has ALARM
-	  }
+	  control_buzzer_update(&control); // Update buzzer state
 
-	  if (error_pending) local_event = ERROR_HAPPEN; // overwrite if has ERROR
-
-	  fsm_run(local_event);
-	  current_state = fsm_get();
-	  menu_setting();
-
-	  control_buzzer_update(&control);
-
+	  // Reading sensor values -> Checking alarm and Updating control state
 	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(sht30.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  sht30_status = sht30_get(&sht30);
@@ -322,6 +343,7 @@ int main(void)
 		  sensor_tick = HAL_GetTick();
 	  }
 
+	  // Displaying on OLED
 	  if ((HAL_GetTick() - oled_tick) >= 250 && (HAL_I2C_GetState(oled.i2c)) == HAL_I2C_STATE_READY)
 	  {
 		  display_update(current_state, &oled, &sht30, &control);
