@@ -1,0 +1,10 @@
+../Core/Src/display.c:7:13:running_display	32	static
+../Core/Src/display.c:50:13:draw_cursor	16	static
+../Core/Src/display.c:55:13:menu_display	16	static
+../Core/Src/display.c:65:13:set_hum_display	32	static
+../Core/Src/display.c:90:13:error_display	16	static
+../Core/Src/display.c:97:13:set_alarm_display	32	static
+../Core/Src/display.c:123:13:set_alarm_back_display	16	static
+../Core/Src/display.c:129:13:set_alarm_temp_display	32	static
+../Core/Src/display.c:154:13:set_alarm_hum_display	32	static
+../Core/Src/display.c:193:6:display_update	24	static

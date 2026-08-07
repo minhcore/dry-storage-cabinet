@@ -148,10 +148,6 @@ void menu_setting(void)
 		if (local_event == UP) control.temp_limit = (control.temp_limit == 100) ? 100 : control.temp_limit + 1;
 		else if (local_event == DOWN) control.temp_limit = (control.temp_limit == 0) ? 0 : control.temp_limit - 1;
 		break;
-	case SET_ALARM_DELAY_TEMP_CHOOSE:
-		if (local_event == UP) control.temp_delay_mins = (control.temp_delay_mins == 120) ? 120 : control.temp_delay_mins + 5;
-		else if (local_event == DOWN) control.temp_delay_mins = (control.temp_delay_mins == 0) ? 0 : control.temp_delay_mins - 5;
-		break;
 	case SET_ALARM_MARGIN_HUM_CHOOSE:
 		if (local_event == UP) control.hum_margin = (control.hum_margin == 10) ? 10 : control.hum_margin + 0.5;
 		else if (local_event == DOWN) control.hum_margin = (control.hum_margin == 0) ? 0 : control.hum_margin - 0.5;
@@ -297,6 +293,8 @@ int main(void)
 			  sht30_calculate(&sht30);
 			  ntc_calculate_temp(&ntc);
 
+			  control_alarm_hum_check(&control, &sht30);
+			  control_alarm_temp_check(&control, &sht30);
 			  control_update(&control, &ntc, &sht30);
 
 			  sensor_error = 0; // reset sensor error when sht30 and ntc read OK

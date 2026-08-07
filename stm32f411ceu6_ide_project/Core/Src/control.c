@@ -1,25 +1,29 @@
 #include "control.h"
 #include <math.h>
 
+static uint32_t hum_delay_tick = 0;
+static uint32_t buzzer_tick = 0;
+static float prev_target = DEFAULT_TARGET_HUM;
+
 static control_profile_t control_get_profile(float target_hum)
 {
     control_profile_t profile;
 
-    if (target_hum <= 40.0f)
+    if (target_hum <= 40.0)
     {
         profile.on_advance = LOW_ON_ADVANCE;
         profile.off_advance = LOW_OFF_ADVANCE;
         profile.min_on_ms = LOW_MIN_ON_MS;
         profile.min_off_ms = LOW_MIN_OFF_MS;
-        profile.id = 0U;
+        profile.id = 0;
     }
-    else if (target_hum <= 50.0f)
+    else if (target_hum <= 50.0)
     {
         profile.on_advance = MID_ON_ADVANCE;
         profile.off_advance = MID_OFF_ADVANCE;
         profile.min_on_ms = MID_MIN_ON_MS;
         profile.min_off_ms = MID_MIN_OFF_MS;
-        profile.id = 1U;
+        profile.id = 1;
     }
     else
     {
@@ -27,7 +31,7 @@ static control_profile_t control_get_profile(float target_hum)
         profile.off_advance = HIGH_OFF_ADVANCE;
         profile.min_on_ms = HIGH_MIN_ON_MS;
         profile.min_off_ms = HIGH_MIN_OFF_MS;
-        profile.id = 2U;
+        profile.id = 2;
     }
 
     return profile;
@@ -109,25 +113,26 @@ void control_init(
     control->control_started = false;
 
     control->temp_limit = DEFAULT_TEMP_LIMIT_ALARM;
-    control->temp_delay_mins = DEFAULT_TEMP_DELAY_ALARM;
     control->hum_margin = DEFAULT_HUM_MARGIN_ALARM;
     control->hum_delay_mins = DEFAULT_HUM_DELAY_ALARM;
     control->is_buzzer = true;
+    control->is_alarm_temp = false;
+    control->is_alarm_hum = false;
 
     control->last_state_tick = HAL_GetTick();
     control->state_elapsed_ms = 0;
 
     control_profile_t profile = control_get_profile(DEFAULT_TARGET_HUM);
 
-    control->debug_turn_on = target_hum - profile.on_advance;
-    control->debug_turn_off = target_hum + profile.off_advance;
-    control->debug_dewpoint = 0.0f;
+    control->debug_turn_on = control->target_hum - profile.on_advance;
+    control->debug_turn_off = control->target_hum + profile.off_advance;
+    control->debug_dewpoint = 0.0;
 
-    control->debug_peltier = 0U;
-    control->debug_cold_fan = 0U;
+    control->debug_peltier = 0;
+    control->debug_cold_fan = 0;
     control->debug_profile = profile.id;
-    control->debug_condensing_started = 0U;
-    control->debug_fan_boost_allowed = 0U;
+    control->debug_condensing_started = 0;
+    control->debug_fan_boost_allowed = 0;
 
     HAL_TIM_PWM_Start(tim, tim_channel);
 
@@ -226,6 +231,18 @@ void control_update(
         }
     }
 
+    if (control->is_alarm_hum || control->is_alarm_temp)
+    {
+    	if(control->is_buzzer)
+    	{
+    		if ((HAL_GetTick() - buzzer_tick) >= 1000)
+    		    {
+    		    	HAL_GPIO_TogglePin(control->buzzer_port, control->buzzer_pin);
+    		    	buzzer_tick = HAL_GetTick();
+    		    }
+    	}
+    }
+
     control->state_elapsed_ms = state_elapsed;
 
     control->debug_turn_on = turn_on_thres;
@@ -245,5 +262,35 @@ void control_update(
 
     control->debug_fan_boost_allowed =
             fan_boost_allowed ? 1U : 0U;
+}
+
+void control_alarm_hum_check(control_t *control, sht30_t *sht30)
+{
+	bool target_changed;
+	if (control->target_hum != prev_target)
+	{
+		target_changed = true;
+		prev_target = control->target_hum;
+	}
+	else
+	{
+		target_changed = false;
+	}
+
+	if (target_changed) hum_delay_tick = HAL_GetTick(); // Reset
+	else if ((HAL_GetTick() - hum_delay_tick) >= (control->hum_delay_mins * 60 * 1000))
+	{
+		float pos_margin = control->target_hum + control->hum_margin;
+		float neg_margin = control->target_hum - control->hum_margin;
+		if ((sht30->hum > pos_margin) || (sht30->hum < neg_margin))
+		{
+			control->is_alarm_hum = true;
+		}
+	}
+}
+
+void control_alarm_temp_check(control_t* control, sht30_t *sht30)
+{
+	if (sht30->temp > control->temp_limit) control->is_alarm_temp = true;
 }
 

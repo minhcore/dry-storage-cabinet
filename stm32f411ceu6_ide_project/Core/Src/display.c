@@ -4,7 +4,7 @@
 static uint32_t display_tick;
 static bool toggle = false;
 
-static void running_display(oled_t* oled, sht30_t* sht30, control_t* control, bool alarm_active)
+static void running_display(oled_t* oled, sht30_t* sht30, control_t* control)
 {
 	uint8_t current_x = 0;
 	uint16_t hum = sht30->hum * 10;
@@ -41,7 +41,8 @@ static void running_display(oled_t* oled, sht30_t* sht30, control_t* control, bo
 	current_x += 16;
 	oled_draw_string(oled," %", 4, current_x);
 
-	if (alarm_active) oled_draw_string(oled, "ALARM!", 6, 0);
+	if (control->is_alarm_hum) oled_draw_string(oled, "ALARM HUM!", 6, 0);
+	else if (control->is_alarm_temp) oled_draw_string(oled, "ALARM TEMP!", 6, 0);
 	else oled_draw_string(oled, "STATUS: OK", 6, 0);
 
 }
@@ -80,7 +81,7 @@ static void set_hum_display(oled_t* oled, control_t* control, bool tick, uint8_t
 		{
 			if (toggle) oled_draw_char(oled, ':', 2, 56);
 			else oled_draw_char(oled, ' ', 2, 56);
-			toggle = ~toggle;
+			toggle = !toggle;
 			display_tick = HAL_GetTick();
 		}
 	}
@@ -113,7 +114,7 @@ static void set_alarm_display(oled_t* oled, control_t* control, uint8_t cursor, 
 		{
 			if (toggle) oled_draw_char(oled, ':', 6, 64);
 			else oled_draw_char(oled, ' ', 6, 64);
-			toggle = ~toggle;
+			toggle = !toggle;
 			display_tick = HAL_GetTick();
 		}
 	}
@@ -144,7 +145,7 @@ static void set_alarm_temp_display(oled_t* oled, control_t* control, uint8_t cur
 		{
 			if (toggle) oled_draw_char(oled, ':', 2, 64);
 			else oled_draw_char(oled, ' ', 2, 64);
-			toggle = ~toggle;
+			toggle = !toggle;
 			display_tick = HAL_GetTick();
 		}
 	}
@@ -183,7 +184,7 @@ static void set_alarm_hum_display(oled_t* oled, control_t* control, uint8_t curs
 				if (toggle) oled_draw_char(oled, ':', 2, 72);
 				else oled_draw_char(oled, ' ', 2, 72);
 			}
-			toggle = ~toggle;
+			toggle = !toggle;
 			display_tick = HAL_GetTick();
 		}
 	}

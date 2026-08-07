@@ -57,9 +57,11 @@ typedef struct
     uint16_t peltier_pin;
     uint16_t hot_fan_pin;
 
-    // Peltier LED
+    // Peltier LED & Buzzer
     GPIO_TypeDef *peltier_led_port;
     uint16_t peltier_led_pin;
+    GPIO_TypeDef *buzzer_port;
+    uint16_t buzzer_pin;
 
     // Control Value
     float target_hum;
@@ -71,10 +73,12 @@ typedef struct
 
     // Temp Alarm (If current temp reaches temp_limit, the alarm will go on)
     float temp_limit;
+    bool is_alarm_temp;
 
 	// Hum Alarm (If after hum_delay (time after starting machine or changing target), the current hum still exceeds the +-hum_margin, the alarm will go on)
     float hum_margin;
     float hum_delay_mins;	// minutes
+    bool is_alarm_hum;
 
     // Buzzer
     bool is_buzzer;
@@ -104,13 +108,10 @@ void control_init(
         GPIO_TypeDef *peltier_led_port,
         uint16_t peltier_led_pin);
 
-void control_update(
-        control_t *control,
-        ntc_t *ntc,
-        sht30_t *sht30);
+void control_update(control_t *control ,ntc_t *ntc, sht30_t *sht30);
 
-void control_filter_hum(
-        control_t *control,
-        sht30_t *sht30);
+void control_alarm_hum_check(control_t *control, sht30_t *sht30);
+
+void control_alarm_temp_check(control_t* control, sht30_t *sht30);
 
 #endif /* CONTROL_H_ */

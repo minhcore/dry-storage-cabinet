@@ -1,0 +1,3 @@
+../Core/Src/fsm.c:52:6:fsm_init	1
+../Core/Src/fsm.c:56:6:fsm_run	6
+../Core/Src/fsm.c:79:9:fsm_get	1

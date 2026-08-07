@@ -1,0 +1,10 @@
+../Core/Src/control.c:8:26:control_get_profile	48	static
+../Core/Src/control.c:40:13:control_peltier_output	16	static
+../Core/Src/control.c:45:13:control_cold_fan_output	16	static
+../Core/Src/control.c:50:13:control_set_peltier	24	static
+../Core/Src/control.c:65:13:control_set_cold_fan	16	static
+../Core/Src/control.c:73:14:dew_point_calculate	40	static
+../Core/Src/control.c:86:6:control_init	48	static
+../Core/Src/control.c:146:6:control_update	104	static
+../Core/Src/control.c:267:6:control_alarm_hum_check	32	static
+../Core/Src/control.c:292:6:control_alarm_temp_check	16	static
