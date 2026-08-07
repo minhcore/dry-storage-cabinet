@@ -52,15 +52,15 @@ typedef struct
     uint32_t tim_channel;
 
     // Peltier and Hot Fan
-    GPIO_TypeDef *peltier_port;
-    GPIO_TypeDef *hot_fan_port;
+    GPIO_TypeDef* peltier_port;
+    GPIO_TypeDef* hot_fan_port;
     uint16_t peltier_pin;
     uint16_t hot_fan_pin;
 
     // Peltier LED & Buzzer
-    GPIO_TypeDef *peltier_led_port;
+    GPIO_TypeDef* peltier_led_port;
     uint16_t peltier_led_pin;
-    GPIO_TypeDef *buzzer_port;
+    GPIO_TypeDef* buzzer_port;
     uint16_t buzzer_pin;
 
     // Control Value
@@ -74,11 +74,13 @@ typedef struct
     // Temp Alarm (If current temp reaches temp_limit, the alarm will go on)
     float temp_limit;
     bool is_alarm_temp;
+    bool temp_alarm_ack;
 
 	// Hum Alarm (If after hum_delay (time after starting machine or changing target), the current hum still exceeds the +-hum_margin, the alarm will go on)
     float hum_margin;
     float hum_delay_mins;	// minutes
     bool is_alarm_hum;
+    bool hum_alarm_ack;
 
     // Buzzer
     bool is_buzzer;
@@ -98,22 +100,26 @@ typedef struct
 } control_t;
 
 void control_init(
-        control_t *control,
-        TIM_HandleTypeDef *tim,
+        control_t* control,
+        TIM_HandleTypeDef* tim,
         uint32_t tim_channel,
-        GPIO_TypeDef *peltier_port,
+        GPIO_TypeDef* peltier_port,
         uint16_t peltier_pin,
-        GPIO_TypeDef *hot_fan_port,
+        GPIO_TypeDef* hot_fan_port,
         uint16_t hot_fan_pin,
-        GPIO_TypeDef *peltier_led_port,
+        GPIO_TypeDef* peltier_led_port,
         uint16_t peltier_led_pin,
 		GPIO_TypeDef* buzzer_port,
 		uint16_t buzzer_pin);
 
-void control_update(control_t *control ,ntc_t *ntc, sht30_t *sht30);
+void control_update(control_t* control ,ntc_t* ntc, sht30_t* sht30);
 
-void control_alarm_hum_check(control_t *control, sht30_t *sht30);
+void control_alarm_hum_check(control_t* control, sht30_t* sht30);
 
-void control_alarm_temp_check(control_t* control, sht30_t *sht30);
+void control_alarm_temp_check(control_t* control, sht30_t* sht30);
+
+void control_alarm_ack(control_t* control);
+
+void control_buzzer_update(control_t* control);
 
 #endif /* CONTROL_H_ */

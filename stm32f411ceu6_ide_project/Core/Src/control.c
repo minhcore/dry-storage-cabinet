@@ -123,6 +123,8 @@ void control_init(
     control->is_buzzer = true;
     control->is_alarm_temp = false;
     control->is_alarm_hum = false;
+    control->temp_alarm_ack = false;
+    control->hum_alarm_ack = false;
 
     control->last_state_tick = HAL_GetTick();
     control->state_elapsed_ms = 0;
@@ -236,18 +238,6 @@ void control_update(
         }
     }
 
-    if (control->is_alarm_hum || control->is_alarm_temp)
-    {
-    	if(control->is_buzzer)
-    	{
-    		if ((HAL_GetTick() - buzzer_tick) >= 1000)
-    		    {
-    		    	HAL_GPIO_TogglePin(control->buzzer_port, control->buzzer_pin);
-    		    	buzzer_tick = HAL_GetTick();
-    		    }
-    	}
-    }
-
     control->state_elapsed_ms = state_elapsed;
 
     control->debug_turn_on = turn_on_thres;
@@ -272,6 +262,9 @@ void control_update(
 void control_alarm_hum_check(control_t *control, sht30_t *sht30)
 {
 	bool target_changed;
+	bool enough_delay;
+	float pos_margin;
+	float neg_margin;
 	if (control->target_hum != prev_target)
 	{
 		target_changed = true;
@@ -283,19 +276,61 @@ void control_alarm_hum_check(control_t *control, sht30_t *sht30)
 	}
 
 	if (target_changed) hum_delay_tick = HAL_GetTick(); // Reset
-	else if ((HAL_GetTick() - hum_delay_tick) >= (control->hum_delay_mins * 60 * 1000))
+
+	enough_delay = ((HAL_GetTick() - hum_delay_tick) >= control->hum_delay_mins * 60 * 1000);
+	pos_margin = control->target_hum + control->hum_margin;
+	neg_margin = control->target_hum - control->hum_margin;
+
+	if (!enough_delay || (sht30->hum <= pos_margin) || (sht30->hum >= neg_margin)) // Safe
 	{
-		float pos_margin = control->target_hum + control->hum_margin;
-		float neg_margin = control->target_hum - control->hum_margin;
-		if ((sht30->hum > pos_margin) || (sht30->hum < neg_margin))
-		{
-			control->is_alarm_hum = true;
-		}
+		control->is_alarm_hum = false;
+		control->hum_alarm_ack = false;
+	}
+	else if (!control->hum_alarm_ack)
+	{
+		control->is_alarm_hum = true;
 	}
 }
 
 void control_alarm_temp_check(control_t* control, sht30_t *sht30)
-{
-	if (sht30->temp > control->temp_limit) control->is_alarm_temp = true;
+{	if (sht30->temp <= control->temp_limit) // Safe
+	{
+	control->is_alarm_temp = false;
+	control->temp_alarm_ack = false;
+	}
+	else if (!control->temp_alarm_ack)
+	{
+	control->is_alarm_temp = true;
+	}
 }
+
+void control_alarm_ack(control_t* control)
+{
+	if (control->is_alarm_hum) control->hum_alarm_ack = true;
+
+	if (control->is_alarm_temp) control->temp_alarm_ack = true;
+
+	control->is_alarm_hum = false;
+	control->is_alarm_temp = false;
+
+	HAL_GPIO_WritePin(control->buzzer_port, control->buzzer_pin, 0);
+}
+
+void control_buzzer_update(control_t* control)
+{
+	bool buzzer_req = control->is_buzzer && (control->is_alarm_hum || control->is_alarm_temp);
+
+	if (!buzzer_req)
+	{
+		HAL_GPIO_WritePin(control->buzzer_port, control->buzzer_pin, 0);
+		buzzer_tick = HAL_GetTick();
+		return;
+	}
+	else if ((HAL_GetTick() - buzzer_tick) >= 500)
+	{
+		HAL_GPIO_TogglePin(control->buzzer_port, control->buzzer_pin);
+		buzzer_tick = HAL_GetTick();
+	}
+}
+
 

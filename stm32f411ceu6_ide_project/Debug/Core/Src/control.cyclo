@@ -5,6 +5,8 @@
 ../Core/Src/control.c:65:13:control_set_cold_fan	2
 ../Core/Src/control.c:73:14:dew_point_calculate	1
 ../Core/Src/control.c:86:6:control_init	1
-../Core/Src/control.c:151:6:control_update	32
-../Core/Src/control.c:272:6:control_alarm_hum_check	6
-../Core/Src/control.c:297:6:control_alarm_temp_check	2
+../Core/Src/control.c:153:6:control_update	28
+../Core/Src/control.c:262:6:control_alarm_hum_check	7
+../Core/Src/control.c:295:6:control_alarm_temp_check	3
+../Core/Src/control.c:307:6:control_alarm_ack	3
+../Core/Src/control.c:319:6:control_buzzer_update	6

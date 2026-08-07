@@ -281,11 +281,21 @@ int main(void)
 	  event = NONE;
 	  __enable_irq();
 
-	  if (error_pending) local_event = ERROR_HAPPEN;
+	  state_e state_before_event = fsm_get();
+
+	  if ((state_before_event == RUNNING) && (local_event == PRESSED) && (control.is_alarm_hum || control.is_alarm_temp))
+	  {
+		  control_alarm_ack(&control);
+		  local_event = NONE; // overwrite if has ALARM
+	  }
+
+	  if (error_pending) local_event = ERROR_HAPPEN; // overwrite if has ERROR
 
 	  fsm_run(local_event);
 	  current_state = fsm_get();
 	  menu_setting();
+
+	  control_buzzer_update(&control);
 
 	  if (((HAL_GetTick() - sensor_tick) >= 500) && (HAL_I2C_GetState(sht30.i2c)) == HAL_I2C_STATE_READY)
 	  {

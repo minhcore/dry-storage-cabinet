@@ -41,7 +41,8 @@ static void running_display(oled_t* oled, sht30_t* sht30, control_t* control)
 	current_x += 16;
 	oled_draw_string(oled," %", 4, current_x);
 
-	if (control->is_alarm_hum) oled_draw_string(oled, "ALARM HUM!", 6, 0);
+	if(control->is_alarm_hum && control->is_alarm_temp) oled_draw_string(oled, "ALARM H&T!", 6, 0);
+	else if (control->is_alarm_hum) oled_draw_string(oled, "ALARM HUM!", 6, 0);
 	else if (control->is_alarm_temp) oled_draw_string(oled, "ALARM TEMP!", 6, 0);
 	else oled_draw_string(oled, "STATUS: OK", 6, 0);
 
