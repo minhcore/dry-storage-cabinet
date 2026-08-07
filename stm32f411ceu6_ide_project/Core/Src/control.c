@@ -281,7 +281,7 @@ void control_alarm_hum_check(control_t *control, sht30_t *sht30)
 	pos_margin = control->target_hum + control->hum_margin;
 	neg_margin = control->target_hum - control->hum_margin;
 
-	if (!enough_delay || (sht30->hum <= pos_margin) || (sht30->hum >= neg_margin)) // Safe
+	if (!enough_delay || ((sht30->hum <= pos_margin) && (sht30->hum >= neg_margin))) // Safe
 	{
 		control->is_alarm_hum = false;
 		control->hum_alarm_ack = false;
